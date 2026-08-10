@@ -1,0 +1,53 @@
+name: Quality gate
+
+# Runs on every push and pull request. No emulator, no Appium, no API key, no secrets.
+# Anyone who forks this repository gets a green build on their first push.
+#
+# It calls `qualityGate` rather than `check`, because `check` in :tests correctly
+# includes the device-backed suites. Naming the tasks is what keeps "the gate is green"
+# from quietly meaning "the gate skipped everything".
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: quality-gate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    name: Java ${{ matrix.java }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 21 is the toolchain the project targets. 25 runs too, so a future bump is a
+        # known quantity rather than a surprise.
+        java: [21, 25]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK ${{ matrix.java }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ matrix.java }}
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Quality gate
+        run: ./gradlew qualityGate --stacktrace
+
+      - name: Upload unit test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-report-java${{ matrix.java }}
+          path: core/build/reports/tests/test
+          retention-days: 7
+          if-no-files-found: ignore

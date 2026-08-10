@@ -1,0 +1,50 @@
+# Critical-path smoke, in the fast lane.
+#
+# The division of labour with Appium is deliberate (ADR-008): Maestro answers "is the app
+# fundamentally alive?" in seconds and gates the slower job. It absorbs timing flakiness
+# automatically, which is exactly right for a smoke check and exactly wrong for a suite that
+# needs to make precise claims about waits and state.
+#
+# Selectors are the app's own testIDs, the same values the Java screen objects use (ADR-003).
+
+appId: com.saucelabs.mydemoapp.rn
+name: Critical path smoke
+---
+- launchApp:
+    clearState: true
+
+# The app opens on the catalog, not on login.
+- assertVisible:
+    id: "products screen"
+- assertVisible:
+    id: "store item"
+
+# Open the first product and add it to the cart.
+- tapOn:
+    id: "store item"
+    index: 0
+- assertVisible:
+    id: "product screen"
+- tapOn:
+    id: "Add To Cart button"
+
+# The cart affordance differs by platform — a header badge on Android, a tab bar on iOS.
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - tapOn:
+          id: "cart badge"
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn:
+          id: "tab bar option cart"
+
+- assertVisible:
+    id: "cart screen"
+- assertVisible:
+    id: "product row"
+- assertVisible:
+    id: "Proceed To Checkout button"

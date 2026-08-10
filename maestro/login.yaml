@@ -1,0 +1,42 @@
+# Login smoke — the other thing that, if broken, makes the deep suite pointless to run.
+
+appId: com.saucelabs.mydemoapp.rn
+name: Login smoke
+---
+- launchApp:
+    clearState: true
+
+- assertVisible:
+    id: "products screen"
+
+# Login lives behind the drawer on Android and the tab bar on iOS.
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - tapOn:
+          id: "open menu"
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn:
+          id: "tab bar option menu"
+
+- tapOn:
+    id: "menu item log in"
+- assertVisible:
+    id: "login screen"
+
+- tapOn:
+    id: "Username input field"
+- inputText: "bob@example.com"
+- tapOn:
+    id: "Password input field"
+- inputText: "10203040"
+- hideKeyboard
+- tapOn:
+    id: "Login button"
+
+- assertVisible:
+    id: "products screen"
