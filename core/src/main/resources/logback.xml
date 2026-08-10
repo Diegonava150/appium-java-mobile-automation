@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+
+  <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder>
+      <!-- Thread name is load-bearing here: with a device pool, knowing which worker
+           produced a line is the difference between a readable log and a soup. -->
+      <pattern>%d{HH:mm:ss.SSS} %-5level [%thread] %-32logger{0} - %msg%n</pattern>
+    </encoder>
+  </appender>
+
+  <!-- Selenium and Appium's HTTP client are extremely chatty at INFO. -->
+  <logger name="org.openqa.selenium" level="WARN"/>
+  <logger name="io.appium.java_client" level="WARN"/>
+  <logger name="org.asynchttpclient" level="WARN"/>
+
+  <logger name="dev.diegonava.mobile" level="INFO"/>
+
+  <root level="INFO">
+    <appender-ref ref="CONSOLE"/>
+  </root>
+
+</configuration>
