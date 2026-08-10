@@ -1,0 +1,19 @@
+# Normalise line endings so a repo developed on Windows still runs on Linux CI.
+* text=auto eol=lf
+
+# gradlew is executed by /bin/sh on the runners. A CRLF here produces
+# "bad interpreter: No such file or directory", which is a confusing way to
+# discover a line-ending problem.
+gradlew text eol=lf
+
+# Windows-only scripts keep CRLF.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Never touch binaries.
+*.jar   binary
+*.apk   binary
+*.ipa   binary
+*.png   binary
+*.jpg   binary
+*.zip   binary
