@@ -1,0 +1,47 @@
+## Single source of truth for every dependency version.
+## Verified against Maven Central on 2026-08-09.
+
+[versions]
+java             = "21"
+appiumJavaClient = "10.1.1"   # Appium 3 generation. 9.x is the Appium 2 line — do not downgrade.
+selenium         = "4.46.0"
+junit            = "6.1.3"    # JUnit 6 unified Platform + Jupiter versioning; there is no separate 1.x platform.
+assertj          = "3.27.7"   # 4.0 is still milestone-only.
+allure           = "2.35.4"
+restAssured      = "6.0.1"
+jackson          = "2.22.1"
+slf4j            = "2.0.17"
+logback          = "1.6.1"
+awaitility       = "4.3.0"
+spotless         = "8.9.0"
+
+[libraries]
+appium-java-client = { module = "io.appium:java-client",                 version.ref = "appiumJavaClient" }
+selenium-java      = { module = "org.seleniumhq.selenium:selenium-java", version.ref = "selenium" }
+
+junit-bom               = { module = "org.junit:junit-bom",                        version.ref = "junit" }
+junit-jupiter           = { module = "org.junit.jupiter:junit-jupiter" }
+junit-jupiter-api       = { module = "org.junit.jupiter:junit-jupiter-api" }
+junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
+
+assertj-core = { module = "org.assertj:assertj-core",   version.ref = "assertj" }
+awaitility   = { module = "org.awaitility:awaitility",  version.ref = "awaitility" }
+
+# NOTE: `allure-junit5` is now a relocation stub pointing here. Use allure-jupiter.
+# Allure 2.35.4 compiles against Jupiter 5.10.3 / Platform 1.10.3. We run JUnit 6.
+# The integration is a JUnit Platform TestExecutionListener (stable SPI), so this is
+# expected to work — but it is verified explicitly by :tests:allureWiringCheck. See ADR-005.
+allure-jupiter = { module = "io.qameta.allure:allure-jupiter", version.ref = "allure" }
+
+rest-assured    = { module = "io.rest-assured:rest-assured",              version.ref = "restAssured" }
+jackson-bom     = { module = "com.fasterxml.jackson:jackson-bom",         version.ref = "jackson" }
+jackson-databind = { module = "com.fasterxml.jackson.core:jackson-databind" }
+
+slf4j-api       = { module = "org.slf4j:slf4j-api",           version.ref = "slf4j" }
+logback-classic = { module = "ch.qos.logback:logback-classic", version.ref = "logback" }
+
+# Plugin markers, for build-logic's classpath.
+spotless-plugin = { module = "com.diffplug.spotless:spotless-plugin-gradle", version.ref = "spotless" }
+
+[plugins]
+spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }

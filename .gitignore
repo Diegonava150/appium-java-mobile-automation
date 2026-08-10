@@ -1,0 +1,37 @@
+# Gradle
+.gradle/
+build/
+build-logic/build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# App binaries — downloaded by `./gradlew downloadAndroidApp`, never committed.
+# A 30 MB APK in git is a permanent tax on every clone, and it goes stale on the
+# next upstream release. See ADR-001.
+*.apk
+*.ipa
+*.app/
+*.aab
+
+# Test output
+allure-results/
+allure-report/
+test-artifacts/
+**/build/test-artifacts/
+
+# Local configuration — machine-specific device ids, paths, keys
+mobile.properties
+local.properties
+.env
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+out/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini

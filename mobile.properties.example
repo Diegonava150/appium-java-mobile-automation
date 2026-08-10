@@ -1,0 +1,54 @@
+# Copy to `mobile.properties` (git-ignored) to set local defaults, or pass any of these
+# as -Dkey=value, or as an environment variable with dots replaced by underscores and
+# the whole key uppercased (mobile.platform -> MOBILE_PLATFORM).
+#
+# Precedence, highest first:  -D system property  >  environment variable  >  this file  >  built-in default
+
+# ---- platform -------------------------------------------------------------
+mobile.platform=android
+
+# ---- appium ---------------------------------------------------------------
+mobile.appium.host=127.0.0.1
+# Slot n listens on basePort + n.
+mobile.appium.basePort=4723
+# Start a server per slot instead of assuming one is already running.
+mobile.appium.autoStart=false
+
+# ---- devices --------------------------------------------------------------
+# Pool size. Test parallelism is pinned to this number.
+mobile.device.count=1
+
+# Explicit device ids, comma separated. Leave blank to let Appium pick the only
+# attached device — usually what you want with a single local emulator.
+# mobile.android.devices=emulator-5554,emulator-5556
+# mobile.ios.devices=
+
+mobile.android.deviceName=Android Emulator
+mobile.ios.deviceName=iPhone 16
+# mobile.android.platformVersion=16
+# mobile.ios.platformVersion=18.2
+
+# Per-slot port bases. Changing these is only necessary if something else on the
+# machine already owns the range.
+mobile.android.systemPortBase=8200
+mobile.ios.wdaLocalPortBase=8100
+mobile.mjpegServerPortBase=9100
+
+# ---- app under test -------------------------------------------------------
+# Set automatically by the Gradle test task from `./gradlew downloadAndroidApp`.
+# Override to point at a local debug build.
+# mobile.app.android=/path/to/app.apk
+# mobile.app.ios=/path/to/MyRNDemoApp.app
+# mobile.app.package=com.saucelabs.mydemoapp.rn
+# mobile.app.bundleId=com.saucelabs.mydemoapp.rn
+mobile.app.noReset=false
+mobile.app.fullReset=false
+
+# ---- timeouts (seconds) ---------------------------------------------------
+mobile.timeout.element.seconds=20
+mobile.timeout.command.seconds=120
+mobile.timeout.deviceLease.seconds=300
+
+# ---- failure artifacts ----------------------------------------------------
+mobile.artifacts.onFailure=true
+# mobile.artifacts.dir=build/test-artifacts
