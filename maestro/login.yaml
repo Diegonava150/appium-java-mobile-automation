@@ -1,4 +1,6 @@
 # Login smoke — the other thing that, if broken, makes the deep suite pointless to run.
+#
+# See smoke.yaml for why these use `text:` rather than `id:`.
 
 appId: com.saucelabs.mydemoapp.rn
 name: Login smoke
@@ -7,36 +9,26 @@ name: Login smoke
     clearState: true
 
 - assertVisible:
-    id: "products screen"
+    text: "products screen"
 
-# Login lives behind the drawer on Android and the tab bar on iOS.
-- runFlow:
-    when:
-      platform: Android
-    commands:
-      - tapOn:
-          id: "open menu"
-- runFlow:
-    when:
-      platform: iOS
-    commands:
-      - tapOn:
-          id: "tab bar option menu"
-
+# Login lives behind the drawer.
 - tapOn:
-    id: "menu item log in"
+    text: "open menu"
+- tapOn:
+    text: "menu item log in"
 - assertVisible:
-    id: "login screen"
+    text: "login screen"
 
 - tapOn:
-    id: "Username input field"
+    text: "Username input field"
 - inputText: "bob@example.com"
+- hideKeyboard
 - tapOn:
-    id: "Password input field"
+    text: "Password input field"
 - inputText: "10203040"
 - hideKeyboard
 - tapOn:
-    id: "Login button"
+    text: "Login button"
 
 - assertVisible:
-    id: "products screen"
+    text: "products screen"

@@ -93,11 +93,20 @@ jobs:
           force-avd-creation: false
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: true
+          # The Appium server has to be killed explicitly. A backgrounded process keeps the
+          # runner's script step alive after the tests finish, so the job sits idle until the
+          # job timeout cancels it — the suite goes green and the build still reports red.
           script: |
             adb devices
             appium --port 4723 --log-level info --log appium.log &
+            appium_pid=$!
             npx wait-on -t 60000 http-get://127.0.0.1:4723/status
+            set +e
             ./gradlew :tests:test -Dmobile.platform=android --stacktrace
+            status=$?
+            set -e
+            kill "$appium_pid" 2>/dev/null || true
+            exit $status
 
       - name: Upload failure artifacts
         if: failure()

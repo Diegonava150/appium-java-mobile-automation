@@ -46,9 +46,16 @@ public final class LoginScreen extends BaseScreen {
         return this;
     }
 
-    /** Submits and expects to land on the catalog. Use {@link #submitExpectingFailure} otherwise. */
+    /**
+     * Submits and expects to land on the catalog. Use {@link #submitExpectingFailure} otherwise.
+     *
+     * <p>Scrolls to the button first. On Android the keyboard is dismissed after each field and
+     * the button is already in view, so this is a no-op there — but the first iOS simulator run
+     * failed here with "Login button ... was not visible", because XCUITest does not reliably
+     * dismiss the keyboard and the button ends up underneath it.
+     */
     public CatalogScreen submit() {
-        tap(SUBMIT);
+        scrollAndTap(SUBMIT);
         CatalogScreen catalog = new CatalogScreen();
         catalog.awaitLoaded();
         return catalog;
@@ -56,7 +63,7 @@ public final class LoginScreen extends BaseScreen {
 
     /** Submits and stays put, so the caller can assert on the error messaging. */
     public LoginScreen submitExpectingFailure() {
-        tap(SUBMIT);
+        scrollAndTap(SUBMIT);
         return this;
     }
 

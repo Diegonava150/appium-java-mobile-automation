@@ -5,7 +5,14 @@
 # automatically, which is exactly right for a smoke check and exactly wrong for a suite that
 # needs to make precise claims about waits and state.
 #
-# Selectors are the app's own testIDs, the same values the Java screen objects use (ADR-003).
+# Selectors use `text:`, not `id:`. Maestro's `id:` matches the Android resource-id, and this
+# app does not populate it: of 112 nodes in a captured hierarchy, 3 had a resource-id and 40
+# had a content-desc. React Native's testID becomes content-desc on Android, which Maestro
+# reaches through its `text:` matcher (text or accessibility text).
+#
+# That is the same fact ADR-003 rests on, seen from Maestro's side: on Android, a React Native
+# testID is an accessibility label, not an id. Android-only for that reason - the Appium suite
+# carries the cross-platform parity claim, this lane just gates it.
 
 appId: com.saucelabs.mydemoapp.rn
 name: Critical path smoke
@@ -15,36 +22,25 @@ name: Critical path smoke
 
 # The app opens on the catalog, not on login.
 - assertVisible:
-    id: "products screen"
+    text: "products screen"
 - assertVisible:
-    id: "store item"
+    text: "store item"
 
 # Open the first product and add it to the cart.
 - tapOn:
-    id: "store item"
+    text: "store item"
     index: 0
 - assertVisible:
-    id: "product screen"
+    text: "product screen"
 - tapOn:
-    id: "Add To Cart button"
+    text: "Add To Cart button"
 
-# The cart affordance differs by platform — a header badge on Android, a tab bar on iOS.
-- runFlow:
-    when:
-      platform: Android
-    commands:
-      - tapOn:
-          id: "cart badge"
-- runFlow:
-    when:
-      platform: iOS
-    commands:
-      - tapOn:
-          id: "tab bar option cart"
-
+# Android renders the cart as a header badge.
+- tapOn:
+    text: "cart badge"
 - assertVisible:
-    id: "cart screen"
+    text: "cart screen"
 - assertVisible:
-    id: "product row"
+    text: "product row"
 - assertVisible:
-    id: "Proceed To Checkout button"
+    text: "Proceed To Checkout button"

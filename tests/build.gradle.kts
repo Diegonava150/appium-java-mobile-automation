@@ -55,6 +55,10 @@ tasks.named<Test>("test") {
                 appsDir.get().dir("ios").file("MyRNDemoApp.app").asFile.absolutePath,
             )
         }
+        // AppLifecycle resolves the app by bundle id on iOS, the way it uses appPackage on
+        // Android. Its absence only showed up on the first real simulator run, as
+        // "mobile.app.bundleId is not set" — the Android path had been carrying the suite.
+        systemProperty("mobile.app.bundleId", "com.saucelabs.mydemoapp.rn")
     }
 
     systemProperty(
