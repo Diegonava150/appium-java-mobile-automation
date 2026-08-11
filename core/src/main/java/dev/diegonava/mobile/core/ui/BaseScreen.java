@@ -15,6 +15,7 @@ import org.openqa.selenium.TimeoutException;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.interactions.PointerInput;
 import org.openqa.selenium.interactions.Sequence;
+import org.openqa.selenium.support.ui.ExpectedCondition;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
 
@@ -58,11 +59,7 @@ public abstract class BaseScreen {
      */
     public void awaitLoaded() {
         try {
-            wait(config.elementTimeout())
-                    .until(
-                            isAndroid()
-                                    ? ExpectedConditions.visibilityOfElementLocated(rootLocator())
-                                    : ExpectedConditions.presenceOfElementLocated(rootLocator()));
+            wait(config.elementTimeout()).until(onScreen(rootLocator()));
         } catch (TimeoutException e) {
             throw new TimeoutException(
                     "%s did not appear within %ds. Expected root locator: %s"
@@ -89,7 +86,34 @@ public abstract class BaseScreen {
     }
 
     protected List<WebElement> allVisible(By locator) {
-        return wait(config.elementTimeout()).until(ExpectedConditions.visibilityOfAllElementsLocatedBy(locator));
+        return wait(config.elementTimeout()).until(allOnScreen(locator));
+    }
+
+    /**
+     * "On screen" as each platform actually defines it.
+     *
+     * <p>XCUITest computes visibility from an element's own frame. React Native renders its
+     * containers as zero-size {@code XCUIElementTypeOther} wrappers whose children carry the
+     * layout, so a container reports invisible while everything inside it is plainly on screen —
+     * the first simulator run failed with "element #0 was invisible" for locators that had
+     * matched perfectly well. UiAutomator2 does not have this problem, so Android keeps the
+     * stricter check.
+     *
+     * <p>Applies to container and screen-level lookups only. {@link #visible} and
+     * {@link #clickable}, which back every tap and every keystroke, still demand real visibility
+     * on both platforms — for a control a user has to reach, XCUITest's stricter definition is
+     * the correct one.
+     */
+    private ExpectedCondition<WebElement> onScreen(By locator) {
+        return isAndroid()
+                ? ExpectedConditions.visibilityOfElementLocated(locator)
+                : ExpectedConditions.presenceOfElementLocated(locator);
+    }
+
+    private ExpectedCondition<List<WebElement>> allOnScreen(By locator) {
+        return isAndroid()
+                ? ExpectedConditions.visibilityOfAllElementsLocatedBy(locator)
+                : ExpectedConditions.presenceOfAllElementsLocatedBy(locator);
     }
 
     protected void tap(By locator) {
@@ -122,9 +146,8 @@ public abstract class BaseScreen {
 
     protected boolean isDisplayed(By locator, Duration timeout) {
         try {
-            return wait(timeout)
-                    .until(ExpectedConditions.visibilityOfElementLocated(locator))
-                    .isDisplayed();
+            wait(timeout).until(onScreen(locator));
+            return true;
         } catch (TimeoutException | NoSuchElementException e) {
             return false;
         }

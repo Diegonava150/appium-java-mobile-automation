@@ -98,7 +98,10 @@ jobs:
           # job timeout cancels it — the suite goes green and the build still reports red.
           script: |
             adb devices
-            appium --port 4723 --log-level info --log appium.log &
+            # setsid so Appium leads its own process group and can be killed as a unit,
+            # children included. Killing the bare PID leaves node subprocesses holding the
+            # emulator open, which is what stalls shutdown.
+            setsid appium --port 4723 --log-level info --log appium.log &
             appium_pid=$!
             npx wait-on -t 60000 http-get://127.0.0.1:4723/status
             set +e
@@ -115,7 +118,10 @@ jobs:
             # /home/runner/work/appium-java-mobile-automation, so the pattern matches the runner's
             # own shell and kills the script mid-flight. That surfaces as the near-useless
             # "The process '/usr/bin/sh' failed with exit code null" after every test has passed.
-            kill "$appium_pid" 2>/dev/null || true
+            kill -TERM -"$appium_pid" 2>/dev/null || kill "$appium_pid" 2>/dev/null || true
+            # Narrow pattern on purpose: it appears in Appium's own command line and nowhere
+            # in the runner's, unlike a bare "appium".
+            pkill -f 'appium --port 4723' 2>/dev/null || true
             adb forward --remove-all 2>/dev/null || true
             exit $status
 
