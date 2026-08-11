@@ -109,8 +109,13 @@ jobs:
             # "Terminate Emulator" step blocks waiting for a device that will not shut down.
             # Killing only the Appium process was not enough: UiAutomator2's adb port forwards
             # and the Gradle daemon both outlive it. --no-daemon above covers the second.
+            #
+            # Kill by PID only. `pkill -f appium` looks equivalent and is a trap here: -f matches
+            # the whole command line, and this repository is checked out at
+            # /home/runner/work/appium-java-mobile-automation, so the pattern matches the runner's
+            # own shell and kills the script mid-flight. That surfaces as the near-useless
+            # "The process '/usr/bin/sh' failed with exit code null" after every test has passed.
             kill "$appium_pid" 2>/dev/null || true
-            pkill -f appium 2>/dev/null || true
             adb forward --remove-all 2>/dev/null || true
             exit $status
 
