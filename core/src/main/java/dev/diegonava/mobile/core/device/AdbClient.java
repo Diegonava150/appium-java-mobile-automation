@@ -116,6 +116,29 @@ public final class AdbClient {
         run("shell", "svc", "data", enabled ? "enable" : "disable");
     }
 
+    // ----------------------------------------------------------------- display
+
+    /** Switches the system into or out of dark theme. */
+    public void setDarkMode(boolean enabled) {
+        run("shell", "cmd", "uimode", "night", enabled ? "yes" : "no");
+    }
+
+    /**
+     * Scales system font size, as the accessibility setting does.
+     *
+     * <p>1.0 is the default; users who need larger text routinely run 1.3 or higher. Layouts that
+     * were only ever eyeballed at 1.0 clip, overlap or push their primary action off screen — a
+     * whole class of real bug that no functional test at default settings can see.
+     */
+    public void setFontScale(double scale) {
+        run("shell", "settings", "put", "system", "font_scale", Double.toString(scale));
+    }
+
+    public double fontScale() {
+        String value = run("shell", "settings", "get", "system", "font_scale").strip();
+        return "null".equals(value) ? 1.0d : Double.parseDouble(value);
+    }
+
     // ------------------------------------------------------------------ runner
 
     public String run(String... args) {
