@@ -119,9 +119,13 @@ jobs:
             # own shell and kills the script mid-flight. That surfaces as the near-useless
             # "The process '/usr/bin/sh' failed with exit code null" after every test has passed.
             kill -TERM -"$appium_pid" 2>/dev/null || kill "$appium_pid" 2>/dev/null || true
-            # Narrow pattern on purpose: it appears in Appium's own command line and nowhere
-            # in the runner's, unlike a bare "appium".
-            pkill -f 'appium --port 4723' 2>/dev/null || true
+            # Anything still holding the Appium port goes too, matched BY PORT rather than by
+            # command line. pkill -f is unusable here regardless of how narrow the pattern looks:
+            # the emulator runner executes this step as `sh -c <entire script text>`, so every
+            # word below is also in the shell's own argv, and any -f pattern matches the script
+            # that is running it. That is what produced a red build reporting
+            # "The process '/usr/bin/sh' failed with exit code null" after 21/21 tests passed.
+            lsof -ti:4723 2>/dev/null | xargs -r kill -9 2>/dev/null || true
             adb forward --remove-all 2>/dev/null || true
             exit $status
 
