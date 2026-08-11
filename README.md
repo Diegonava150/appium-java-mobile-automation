@@ -2,6 +2,7 @@
 
 [![Quality gate](https://github.com/Diegonava150/appium-java-mobile-automation/actions/workflows/quality-gate.yml/badge.svg)](https://github.com/Diegonava150/appium-java-mobile-automation/actions/workflows/quality-gate.yml)
 [![Android](https://github.com/Diegonava150/appium-java-mobile-automation/actions/workflows/android.yml/badge.svg)](https://github.com/Diegonava150/appium-java-mobile-automation/actions/workflows/android.yml)
+[![Maestro smoke](https://github.com/Diegonava150/appium-java-mobile-automation/actions/workflows/maestro.yml/badge.svg)](https://github.com/Diegonava150/appium-java-mobile-automation/actions/workflows/maestro.yml)
 
 A cross-platform mobile test framework built around the problems that only exist on a device:
 fragmentation, app lifecycle, in-place upgrades, and flake.
@@ -176,11 +177,15 @@ device-free unit tests. [ADR-005](docs/adr/0005-junit-6-and-allure.md).
 
 **21 device tests and 20 unit tests, all green** on an Android emulator.
 
-**Week 2 — written but not yet executed**
+**CI — running for real**
 
-- [ ] Maestro smoke flows — no Windows build, so CI is their first run
-      ([maestro/README.md](maestro/README.md))
-- [ ] iOS simulator lane — compiled but never run; needs macOS
+- [x] Quality gate, Java 21 and 25 — green, ~1 minute
+- [x] Android emulator matrix, API 31 and 34 — **green, 21/21, ~8½ minutes**
+- [x] Maestro smoke — green
+- [ ] iOS simulator — 17/21 and improving; see below
+
+**Week 2 — not done**
+
 - [ ] Biometric authentication — **not attempted.** Android emulator fingerprint enrolment needs a
       multi-step Settings UI flow that differs by API level. Shipping a fragile version of it
       would have been worse than saying it is not done.
@@ -232,14 +237,18 @@ through adb does not move it either. Rather than delete the test, it became the 
 does hold: the app is portrait-locked and stays that way. A lock that silently disappears in a
 future release would ship an untested rotation path.
 
-**iOS has been compiled, never run.** The screen objects branch correctly and the suite builds, but
-no iOS test has touched a simulator. Expect selector and timing corrections on the first macOS run.
+**iOS is partially green.** 17 of 21 pass on a simulator. The remaining failures are all one
+cause — XCUITest reports React Native's zero-size wrapper containers as invisible, so lookups
+match and then fail a visibility check. Container and screen-level lookups now accept presence on
+iOS while interactive elements still demand visibility; the last few cases are being worked
+through. Android is unaffected and stays on the stricter check.
 
-**The Maestro flows have never executed.** See [maestro/README.md](maestro/README.md) for the
-likeliest first-run failure and its fix.
-
-**The CI workflows are unproven.** They have not run — this repo has no remote yet. Action
-versions are current as of August 2026 and may need bumping.
+**Everything below was found only by pushing.** Three of the four workflows had never executed
+anywhere, and every one of them failed on its first real run — an unset executable bit on
+`gradlew`, a Maestro selector strategy that cannot match this app, a missing iOS bundle id, and
+three separate ways of hanging or self-terminating the Android job. None of these were visible
+from a green local suite. It is the clearest argument in this repository for CI being part of the
+deliverable rather than a decoration on it.
 
 **Upgrade testing is Android-only.** The iOS simulator has no equivalent of `adb install -r`, so
 an in-place upgrade of an installed simulator build is not expressible. Recorded on the test with

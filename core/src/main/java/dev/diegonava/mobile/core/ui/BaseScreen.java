@@ -153,6 +153,16 @@ public abstract class BaseScreen {
         }
     }
 
+    /** Strict visibility on both platforms, for logic that must not accept mere presence. */
+    private boolean isVisibleNow(By locator, Duration timeout) {
+        try {
+            wait(timeout).until(ExpectedConditions.visibilityOfElementLocated(locator));
+            return true;
+        } catch (TimeoutException | NoSuchElementException e) {
+            return false;
+        }
+    }
+
     /**
      * Reads the text of an element, following through to its text-bearing descendants.
      *
@@ -204,7 +214,13 @@ public abstract class BaseScreen {
      */
     protected WebElement scrollUntilVisible(By locator) {
         for (int attempt = 0; attempt < MAX_SCROLL_SWIPES; attempt++) {
-            if (isDisplayed(locator, Duration.ofMillis(500))) {
+            // Genuine visibility, not the platform-relaxed onScreen() check. This loop exists to
+            // decide whether something is on screen yet, so accepting mere presence would make it
+            // answer "yes" for an element scrolled far out of view and return without scrolling
+            // at all. That regression cost iOS two passing login tests: the submit button was
+            // found, never scrolled to, and then failed the clickable check underneath the
+            // keyboard.
+            if (isVisibleNow(locator, Duration.ofMillis(500))) {
                 return driver.findElement(locator);
             }
             swipeUp();
