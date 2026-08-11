@@ -1,7 +1,7 @@
 # Mobile test automation framework — Appium 3 · Java 21
 
-[![Quality gate](https://github.com/Diegonava150/mobile-framework/actions/workflows/quality-gate.yml/badge.svg)](https://github.com/Diegonava150/mobile-framework/actions/workflows/quality-gate.yml)
-[![Android](https://github.com/Diegonava150/mobile-framework/actions/workflows/android.yml/badge.svg)](https://github.com/Diegonava150/mobile-framework/actions/workflows/android.yml)
+[![Quality gate](https://github.com/Diegonava150/appium-java-mobile-automation/actions/workflows/quality-gate.yml/badge.svg)](https://github.com/Diegonava150/appium-java-mobile-automation/actions/workflows/quality-gate.yml)
+[![Android](https://github.com/Diegonava150/appium-java-mobile-automation/actions/workflows/android.yml/badge.svg)](https://github.com/Diegonava150/appium-java-mobile-automation/actions/workflows/android.yml)
 
 A cross-platform mobile test framework built around the problems that only exist on a device:
 fragmentation, app lifecycle, in-place upgrades, and flake.
