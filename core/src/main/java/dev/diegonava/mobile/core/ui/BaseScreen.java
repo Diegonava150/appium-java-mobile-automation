@@ -9,9 +9,12 @@ import java.time.Duration;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.openqa.selenium.By;
+import org.openqa.selenium.Dimension;
 import org.openqa.selenium.NoSuchElementException;
 import org.openqa.selenium.TimeoutException;
 import org.openqa.selenium.WebElement;
+import org.openqa.selenium.interactions.PointerInput;
+import org.openqa.selenium.interactions.Sequence;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
 
@@ -28,6 +31,9 @@ import org.openqa.selenium.support.ui.WebDriverWait;
  * what the test wanted rather than what the page did.
  */
 public abstract class BaseScreen {
+
+    /** Enough swipes to cross any screen in this app; a bound stops a missing element spinning. */
+    private static final int MAX_SCROLL_SWIPES = 8;
 
     protected final AppiumDriver driver = DriverManager.driver();
     protected final FrameworkConfig config = FrameworkConfig.get();
@@ -139,6 +145,59 @@ public abstract class BaseScreen {
         return isAndroid()
                 ? AppiumBy.className("android.widget.TextView")
                 : AppiumBy.className("XCUIElementTypeStaticText");
+    }
+
+    // ------------------------------------------------------------------ helpers
+
+    // ------------------------------------------------------------- scrolling
+
+    /**
+     * Scrolls until {@code locator} is on screen, then returns it.
+     *
+     * <p>Deliberately a W3C pointer gesture rather than {@code UiScrollable}. The usual Android
+     * answer is {@code new UiSelector().scrollIntoView(...)}, but that is the
+     * {@code -android uiautomator} strategy, which ADR-003 bans and {@code checkNoXPath} enforces
+     * — and it has no iOS equivalent, so a suite that leans on it grows a platform branch at every
+     * long form. A synthesised swipe works identically on both platforms and needs no locator
+     * strategy at all.
+     */
+    protected WebElement scrollUntilVisible(By locator) {
+        for (int attempt = 0; attempt < MAX_SCROLL_SWIPES; attempt++) {
+            if (isDisplayed(locator, Duration.ofMillis(500))) {
+                return driver.findElement(locator);
+            }
+            swipeUp();
+        }
+        throw new TimeoutException("%s was not reachable after %d swipes".formatted(locator, MAX_SCROLL_SWIPES));
+    }
+
+    /** One short upward swipe through the middle of the screen. */
+    protected void swipeUp() {
+        Dimension size = driver.manage().window().getSize();
+        int x = size.getWidth() / 2;
+        int startY = (int) (size.getHeight() * 0.70);
+        int endY = (int) (size.getHeight() * 0.30);
+
+        PointerInput finger = new PointerInput(PointerInput.Kind.TOUCH, "finger");
+        Sequence swipe = new Sequence(finger, 0)
+                .addAction(finger.createPointerMove(Duration.ZERO, PointerInput.Origin.viewport(), x, startY))
+                .addAction(finger.createPointerDown(PointerInput.MouseButton.LEFT.asArg()))
+                .addAction(finger.createPointerMove(Duration.ofMillis(400), PointerInput.Origin.viewport(), x, endY))
+                .addAction(finger.createPointerUp(PointerInput.MouseButton.LEFT.asArg()));
+
+        driver.perform(List.of(swipe));
+    }
+
+    /** Scrolls the control into view before tapping it — long forms need this. */
+    protected void scrollAndTap(By locator) {
+        scrollUntilVisible(locator);
+        tap(locator);
+    }
+
+    /** Scrolls the field into view before typing into it. */
+    protected void scrollAndType(By locator, String text) {
+        scrollUntilVisible(locator);
+        type(locator, text);
     }
 
     // ------------------------------------------------------------------ helpers

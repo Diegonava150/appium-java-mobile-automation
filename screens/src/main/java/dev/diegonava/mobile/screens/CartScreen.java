@@ -46,8 +46,26 @@ public final class CartScreen extends BaseScreen {
         return isDisplayed(FOOTER, Duration.ofSeconds(5)) && isDisplayed(CHECKOUT, Duration.ofSeconds(5));
     }
 
-    public void proceedToCheckout() {
+    /**
+     * Taps through to checkout as a signed-in user, landing on the address form.
+     *
+     * <p>Checkout is gated on authentication. Two named methods rather than one that returns
+     * something ambiguous: which screen comes next is a fact about the session, and the test
+     * should have to say which one it expects.
+     */
+    public CheckoutAddressScreen proceedToCheckout() {
         tap(CHECKOUT);
+        CheckoutAddressScreen address = new CheckoutAddressScreen();
+        address.awaitLoaded();
+        return address;
+    }
+
+    /** Taps through to checkout while signed out, which diverts to login. */
+    public LoginScreen proceedToCheckoutExpectingLogin() {
+        tap(CHECKOUT);
+        LoginScreen login = new LoginScreen();
+        login.awaitLoaded();
+        return login;
     }
 
     public CatalogScreen goShopping() {
