@@ -67,7 +67,7 @@ jobs:
           ./gradlew :tests:test \
             -Dmobile.platform=ios \
             -Dmobile.ios.devices=${{ steps.sim.outputs.udid }} \
-            --stacktrace
+            --stacktrace --no-daemon
 
       - name: Upload failure artifacts
         if: failure()

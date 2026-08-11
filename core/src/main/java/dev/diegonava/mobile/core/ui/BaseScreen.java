@@ -41,10 +41,28 @@ public abstract class BaseScreen {
     /** Locator that identifies this screen as loaded. */
     protected abstract By rootLocator();
 
-    /** Blocks until this screen is on display. Call it from the screen's constructor path. */
+    /**
+     * Blocks until this screen is on display. Call it from the screen's constructor path.
+     *
+     * <p>Android waits for visibility; iOS waits only for presence. That asymmetry is not
+     * laziness, it is a genuine difference in what the two automation stacks mean by "visible".
+     * XCUITest computes visibility from an element's own frame, and React Native's screen-level
+     * wrapper is a zero-size {@code XCUIElementTypeOther} whose children carry the actual layout —
+     * so the container reports invisible while everything inside it is plainly on screen. The
+     * first real simulator run failed exactly this way: "element #0 was invisible" for a locator
+     * that had matched.
+     *
+     * <p>Scoped to the screen-level container on purpose. Interactive elements still wait for
+     * visibility on both platforms, because for a control that a user has to tap, XCUITest's
+     * stricter definition is the one that is actually correct.
+     */
     public void awaitLoaded() {
         try {
-            wait(config.elementTimeout()).until(ExpectedConditions.visibilityOfElementLocated(rootLocator()));
+            wait(config.elementTimeout())
+                    .until(
+                            isAndroid()
+                                    ? ExpectedConditions.visibilityOfElementLocated(rootLocator())
+                                    : ExpectedConditions.presenceOfElementLocated(rootLocator()));
         } catch (TimeoutException e) {
             throw new TimeoutException(
                     "%s did not appear within %ds. Expected root locator: %s"

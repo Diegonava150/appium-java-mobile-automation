@@ -102,10 +102,16 @@ jobs:
             appium_pid=$!
             npx wait-on -t 60000 http-get://127.0.0.1:4723/status
             set +e
-            ./gradlew :tests:test -Dmobile.platform=android --stacktrace
+            ./gradlew :tests:test -Dmobile.platform=android --stacktrace --no-daemon
             status=$?
             set -e
+            # Everything holding a handle on the emulator has to go, or the runner's own
+            # "Terminate Emulator" step blocks waiting for a device that will not shut down.
+            # Killing only the Appium process was not enough: UiAutomator2's adb port forwards
+            # and the Gradle daemon both outlive it. --no-daemon above covers the second.
             kill "$appium_pid" 2>/dev/null || true
+            pkill -f appium 2>/dev/null || true
+            adb forward --remove-all 2>/dev/null || true
             exit $status
 
       - name: Upload failure artifacts
