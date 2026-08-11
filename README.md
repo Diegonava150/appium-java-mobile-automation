@@ -95,7 +95,7 @@ variable, then `mobile.properties`, then the built-in default. Copy
 ```
 core/       driver lifecycle, device pool, adb client, JUnit extensions, flake ledger, locators
 screens/    screen objects — one class per screen, no assertions
-tests/      smoke (parity) · conditions · upgrade
+tests/      smoke (parity) · checkout · conditions · upgrade
 maestro/    YAML smoke flows for the fast gate
 build-logic/ Gradle convention plugins
 docs/adr/   why things are the way they are
@@ -169,8 +169,12 @@ device-free unit tests. [ADR-005](docs/adr/0005-junit-6-and-allure.md).
 
 - [x] App upgrade 1.2.0 → 1.3.0 with state-contract assertion — **3/3 green**
 - [x] Device conditions: backgrounding, cold start, warm start, airplane mode — **5/5 green**
+- [x] Full purchase flow, catalog to order confirmation, with form scrolling — **4/4 green**
+- [x] Display conditions: dark theme, 1.3× font scale, orientation contract — **3/3 green**
 - [x] `@Flaky` retry + expiry-dated quarantine + JSON ledger — **self-tested, 20 unit tests green**
 - [x] Two-device parallel execution — **11/11 green, isolation verified** (see the caveat below)
+
+**21 device tests and 20 unit tests, all green** on an Android emulator.
 
 **Week 2 — written but not yet executed**
 
@@ -220,6 +224,13 @@ each runs at roughly half speed. **This design is a correctness mechanism first 
 mechanism second.** Real speedup needs genuinely separate hardware: separate runners, a device
 cloud, or physical handsets. Full numbers in
 [ADR-002](docs/adr/0002-device-pool-parallelism.md#postscript-what-two-devices-actually-bought-measured-2026-08-10).
+
+**Rotation state-loss is untestable against this app.** The intended scenario was the classic
+Android one — rotate mid-flow, watch the Activity get recreated, see what the app forgot to save.
+The app's manifest declares `android:screenOrientation=1` (portrait), and forcing `user_rotation`
+through adb does not move it either. Rather than delete the test, it became the assertion that
+does hold: the app is portrait-locked and stays that way. A lock that silently disappears in a
+future release would ship an untested rotation path.
 
 **iOS has been compiled, never run.** The screen objects branch correctly and the suite builds, but
 no iOS test has touched a simulator. Expect selector and timing corrections on the first macOS run.
