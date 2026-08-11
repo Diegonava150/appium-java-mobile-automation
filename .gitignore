@@ -17,6 +17,10 @@ allure-results/
 allure-report/
 test-artifacts/
 **/build/test-artifacts/
+flake-report.json
+
+# Appium server logs, written next to wherever it was started
+*.log
 
 # Local configuration — machine-specific device ids, paths, keys
 mobile.properties
