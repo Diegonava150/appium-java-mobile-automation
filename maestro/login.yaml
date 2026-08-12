@@ -40,8 +40,13 @@ name: Login smoke
       - tapOn: "Never"
 
 # Signing in and rendering the catalog is the slowest thing in this flow, and this job runs
-# on a shared two-core runner. The default assertion window is tight enough there to fail
+# on a shared two-core runner, where the default assertion window is tight enough to fail
 # intermittently on a login that is merely slow.
-- assertVisible:
-    text: "products screen"
+#
+# extendedWaitUntil rather than assertVisible with a timeout: assertVisible takes no timeout
+# property, and passing one is a hard parse error ("Unknown Property: timeout") that fails the
+# whole file before a single flow runs.
+- extendedWaitUntil:
+    visible:
+      text: "products screen"
     timeout: 30000
