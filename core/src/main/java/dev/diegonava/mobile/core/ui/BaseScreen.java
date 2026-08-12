@@ -167,13 +167,53 @@ public abstract class BaseScreen {
                 if (driver instanceof io.appium.java_client.HidesKeyboard hides) {
                     hides.hideKeyboard();
                 }
-            } else {
+                return;
+            }
+
+            // Works for the alphabetic keyboard, which has a return key to press.
+            try {
                 driver.executeScript(
                         "mobile: hideKeyboard", Map.of("keys", List.of("return", "Done", "Next", "Go", "Search")));
+            } catch (RuntimeException ignored) {
+                // Falls through to the tap below.
+            }
+
+            // The numeric keypad has no dismiss key at all — just digits and a backspace — so
+            // pressing keys cannot work and the checkout payment form stalls with its submit
+            // button behind the keypad. Tapping outside is the only thing that closes it.
+            if (isKeyboardShown()) {
+                tapAboveKeyboard();
             }
         } catch (RuntimeException e) {
             // No keyboard was showing. Not a problem, and not worth a log line.
         }
+    }
+
+    private boolean isKeyboardShown() {
+        try {
+            return driver instanceof io.appium.java_client.HasOnScreenKeyboard keyboard && keyboard.isKeyboardShown();
+        } catch (RuntimeException e) {
+            return false;
+        }
+    }
+
+    /**
+     * Taps the app header to move focus off the field.
+     *
+     * <p>The header is the one region reliably present, inert, and clear of the keyboard on every
+     * screen in this app. Centred horizontally on purpose: the back arrow sits on the left, and
+     * tapping that would navigate away rather than dismiss anything.
+     */
+    private void tapAboveKeyboard() {
+        Dimension size = driver.manage().window().getSize();
+        PointerInput finger = new PointerInput(PointerInput.Kind.TOUCH, "finger");
+        Sequence tap = new Sequence(finger, 0)
+                .addAction(finger.createPointerMove(
+                        Duration.ZERO, PointerInput.Origin.viewport(), size.getWidth() / 2, (int)
+                                (size.getHeight() * 0.07)))
+                .addAction(finger.createPointerDown(PointerInput.MouseButton.LEFT.asArg()))
+                .addAction(finger.createPointerUp(PointerInput.MouseButton.LEFT.asArg()));
+        driver.perform(List.of(tap));
     }
 
     protected boolean isDisplayed(By locator, Duration timeout) {
