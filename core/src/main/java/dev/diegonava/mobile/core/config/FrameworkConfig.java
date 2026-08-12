@@ -105,6 +105,18 @@ public final class FrameworkConfig {
         return integer("mobile.mjpegServerPortBase", 9100);
     }
 
+    /**
+     * Where XCUITest keeps WebDriverAgent's build output.
+     *
+     * <p>Without this, WDA is rebuilt from scratch for every session. Across a 21-test suite that
+     * is the single largest cost on iOS — it is most of why the simulator lane takes forty minutes
+     * against Android's eight. Pointing every session at one derived-data directory means WDA is
+     * compiled once and reused, and the directory is cacheable between CI runs.
+     */
+    public Optional<Path> iosDerivedDataPath() {
+        return optional("mobile.ios.derivedDataPath").map(Path::of).map(Path::toAbsolutePath);
+    }
+
     // --------------------------------------------------------------------- app
 
     /**

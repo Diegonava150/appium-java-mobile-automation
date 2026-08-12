@@ -121,6 +121,19 @@ public abstract class BaseScreen {
     }
 
     /**
+     * Waits for an already-located element to become genuinely interactive, then returns it.
+     *
+     * <p>Needed wherever an element arrives through a container lookup rather than its own
+     * locator, because on iOS those lookups accept presence — see {@link #allOnScreen}. Presence
+     * means "in the accessibility tree", which is true well before a list row has been laid out.
+     * Tapping at that moment does nothing at all: no error, no navigation, and a failure that
+     * surfaces one screen later as "the next screen did not appear".
+     */
+    protected WebElement awaitClickable(WebElement element) {
+        return wait(config.elementTimeout()).until(ExpectedConditions.elementToBeClickable(element));
+    }
+
+    /**
      * Clears the field and types into it, then dismisses the keyboard.
      *
      * <p>The keyboard matters: on both platforms a raised keyboard can cover the very control the

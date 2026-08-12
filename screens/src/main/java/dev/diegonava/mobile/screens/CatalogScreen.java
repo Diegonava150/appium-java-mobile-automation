@@ -40,7 +40,10 @@ public final class CatalogScreen extends BaseScreen {
             throw new IndexOutOfBoundsException(
                     "Requested catalog item %d but only %d are visible".formatted(index, items.size()));
         }
-        items.get(index).click();
+        // Located through a container lookup, so it has to be confirmed interactive before the
+        // tap. On iOS that lookup accepts presence, and a present-but-unlaid-out row swallows
+        // the tap silently.
+        awaitClickable(items.get(index)).click();
         ItemDetailsScreen details = new ItemDetailsScreen();
         details.awaitLoaded();
         return details;

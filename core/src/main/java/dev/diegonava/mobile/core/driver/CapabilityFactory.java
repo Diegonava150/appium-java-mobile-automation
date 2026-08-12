@@ -57,9 +57,14 @@ public final class CapabilityFactory {
                 .setNewCommandTimeout(config.commandTimeout())
                 .setWdaLaunchTimeout(Duration.ofSeconds(240))
                 .setWdaConnectionTimeout(Duration.ofSeconds(240))
-                // Reusing the built WDA turns a ~90s session start into a few seconds.
+                // Reuse the existing WDA rather than reinstalling it per session.
                 .setUsePrebuiltWda(false)
                 .setUseNewWDA(false);
+
+        // Share one derived-data directory so WebDriverAgent is compiled once per machine
+        // instead of once per session. This is the difference between a forty minute iOS run
+        // and something comparable to Android's.
+        config.iosDerivedDataPath().ifPresent(path -> options.setDerivedDataPath(path.toString()));
 
         slot.udid().ifPresent(options::setUdid);
         slot.platformVersion().ifPresent(options::setPlatformVersion);

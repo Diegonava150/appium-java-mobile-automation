@@ -48,6 +48,14 @@ jobs:
       - name: Fetch and unpack the simulator build
         run: ./gradlew unpackIosApp
 
+      # WebDriverAgent is an Xcode project, and without a shared derived-data directory it is
+      # rebuilt for every single session. Caching it is the main lever on this job's runtime.
+      - name: Cache WebDriverAgent derived data
+        uses: actions/cache@v4
+        with:
+          path: ~/wda-derived-data
+          key: wda-derived-data-${{ runner.os }}-v1
+
       - name: Boot a simulator
         id: sim
         run: |
@@ -67,6 +75,7 @@ jobs:
           ./gradlew :tests:test \
             -Dmobile.platform=ios \
             -Dmobile.ios.devices=${{ steps.sim.outputs.udid }} \
+            -Dmobile.ios.derivedDataPath="$HOME/wda-derived-data" \
             --stacktrace --no-daemon
 
       - name: Upload failure artifacts
