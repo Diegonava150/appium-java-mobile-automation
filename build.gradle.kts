@@ -56,12 +56,31 @@ fun registerDownload(taskName: String, key: String, taskDescription: String) =
                 return@doLast
             }
             val url = "https://github.com/saucelabs/my-demo-app-rn/releases/download/$tag/$assetName"
-            logger.lifecycle("Downloading $assetName …")
             file.parentFile.mkdirs()
-            URI(url).toURL().openStream().use { input ->
-                file.outputStream().use { output -> input.copyTo(output) }
+
+            // Retried, because this is a ~31 MB transfer over the public internet on every cold
+            // CI run and it does occasionally break mid-stream. One `SocketException: Unexpected
+            // end of file from server` took out a whole lane, which is an absurd way to lose a
+            // build. A partial file is deleted before retrying so a truncated APK is never left
+            // behind to be "already present" next time.
+            val attempts = 3
+            for (attempt in 1..attempts) {
+                try {
+                    logger.lifecycle("Downloading $assetName (attempt $attempt of $attempts) …")
+                    URI(url).toURL().openStream().use { input ->
+                        file.outputStream().use { output -> input.copyTo(output) }
+                    }
+                    logger.lifecycle("Saved to ${file.absolutePath} (${file.length() / 1024 / 1024} MB)")
+                    return@doLast
+                } catch (e: Exception) {
+                    file.delete()
+                    if (attempt == attempts) {
+                        throw GradleException("Could not download $assetName after $attempts attempts", e)
+                    }
+                    logger.lifecycle("  failed (${e.message}); retrying in ${attempt * 5}s")
+                    Thread.sleep(attempt * 5000L)
+                }
             }
-            logger.lifecycle("Saved to ${file.absolutePath} (${file.length() / 1024 / 1024} MB)")
         }
     }
 
