@@ -59,7 +59,12 @@ public final class CapabilityFactory {
                 .setWdaConnectionTimeout(Duration.ofSeconds(240))
                 // Reuse the existing WDA rather than reinstalling it per session.
                 .setUsePrebuiltWda(false)
-                .setUseNewWDA(false);
+                .setUseNewWDA(false)
+                // iOS offers to save the password after a sign-in, and that dialog is the
+                // system's, not the app's. It floats above the catalog and makes every product
+                // row report as not visible — a failure that reads, unhelpfully, as "the screen
+                // is there and nothing on it can be tapped".
+                .setAutoDismissAlerts(config.iosAutoDismissAlerts());
 
         // Share one derived-data directory so WebDriverAgent is compiled once per machine
         // instead of once per session. This is the difference between a forty minute iOS run

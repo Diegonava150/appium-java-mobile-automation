@@ -117,6 +117,20 @@ public final class FrameworkConfig {
         return optional("mobile.ios.derivedDataPath").map(Path::of).map(Path::toAbsolutePath);
     }
 
+    /**
+     * Whether XCUITest should dismiss iOS system alerts automatically. On by default.
+     *
+     * <p>Signing in makes iOS offer to save the password, and that dialog belongs to the system,
+     * not the app — it sits above the catalog and makes every row report as not visible. The
+     * symptom is baffling from a log: the screen is present, fully populated, and untappable.
+     *
+     * <p>Turn it off for any test whose subject <i>is</i> a system dialog — a permission prompt,
+     * say. Auto-dismissal would answer the prompt before the test could look at it.
+     */
+    public boolean iosAutoDismissAlerts() {
+        return bool("mobile.ios.autoDismissAlerts", true);
+    }
+
     // --------------------------------------------------------------------- app
 
     /**

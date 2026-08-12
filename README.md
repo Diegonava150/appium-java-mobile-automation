@@ -45,10 +45,17 @@ three independent views of the same moment, captured while the device is still o
 screen. This is a `TestExecutionExceptionHandler`, not a `TestWatcher`, because a watcher fires
 after the driver has already quit and there is nothing left to photograph.
 
-That last one paid for itself on day one. The first device run had two failures; the captured
+That last one has paid for itself twice. The first device run had two failures; the captured
 hierarchy showed both were the same root cause — React Native puts `testID` on a wrapper
 `ViewGroup` while the text lives in a child `TextView`, so `getText()` returned `""` rather than
 erroring. One fix in `BaseScreen`, both green.
+
+The second time was better. Three iOS tests failed in CI with "the screen is present and nothing
+on it can be tapped" — the kind of message that tells you nothing. The screenshot the extension
+had captured on the CI runner showed iOS's **"Save Password?"** system dialog sitting over the
+catalog, which is why only the tests that signed in were affected. That was diagnosed from a
+machine the author does not own, off one PNG, in about a minute. No amount of log-reading would
+have found it.
 
 ---
 
