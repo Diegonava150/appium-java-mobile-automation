@@ -114,8 +114,10 @@ jobs:
             # "CatalogScreen did not appear". That is the environment being slow, not the app
             # being wrong, so the honest fix is a timeout that matches the hardware rather than a
             # retry that hides it.
-            ./gradlew :tests:test -Dmobile.platform=android -Dmobile.timeout.element.seconds=40 \
-              --stacktrace --no-daemon
+            # Kept on one line deliberately. A backslash continuation here does not survive the
+            # way the runner action hands this script to the shell: the backslash arrives as its
+            # own argument and Gradle fails in two seconds with "Task '\' not found".
+            ./gradlew :tests:test -Dmobile.platform=android -Dmobile.timeout.element.seconds=40 --stacktrace --no-daemon
             status=$?
             set -e
             # Everything holding a handle on the emulator has to go, or the runner's own

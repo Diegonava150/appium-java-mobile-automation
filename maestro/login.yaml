@@ -30,5 +30,18 @@ name: Login smoke
 - tapOn:
     text: "Login button"
 
+# Android may offer to save the password through Google Password Manager. It is a system
+# dialog, so it sits above the catalog and makes the assertion below fail. Dismiss it only
+# if it is actually there — `when: visible` makes the whole block a no-op otherwise.
+- runFlow:
+    when:
+      visible: "Never"
+    commands:
+      - tapOn: "Never"
+
+# Signing in and rendering the catalog is the slowest thing in this flow, and this job runs
+# on a shared two-core runner. The default assertion window is tight enough there to fail
+# intermittently on a login that is merely slow.
 - assertVisible:
     text: "products screen"
+    timeout: 30000
