@@ -295,12 +295,23 @@ public abstract class BaseScreen {
         throw new TimeoutException("%s was not reachable after %d swipes".formatted(locator, MAX_SCROLL_SWIPES));
     }
 
-    /** One short upward swipe through the middle of the screen. */
+    /**
+     * One short upward swipe through the upper half of the screen.
+     *
+     * <p>Confined to the top half deliberately. The obvious choice is to drag from 70% to 30%,
+     * which uses more of the screen — but a raised keyboard occupies roughly the bottom half, so
+     * that gesture starts *on the keyboard* and scrolls nothing at all. The symptom is a form that
+     * refuses to scroll with no error: "Review Order button was not reachable after 8 swipes",
+     * eight swipes having been delivered to a keypad.
+     *
+     * <p>Staying above the keyboard means the gesture always lands on scrollable content, whether
+     * a keyboard is up or not.
+     */
     protected void swipeUp() {
         Dimension size = driver.manage().window().getSize();
         int x = size.getWidth() / 2;
-        int startY = (int) (size.getHeight() * 0.70);
-        int endY = (int) (size.getHeight() * 0.30);
+        int startY = (int) (size.getHeight() * 0.45);
+        int endY = (int) (size.getHeight() * 0.15);
 
         PointerInput finger = new PointerInput(PointerInput.Kind.TOUCH, "finger");
         Sequence swipe = new Sequence(finger, 0)
