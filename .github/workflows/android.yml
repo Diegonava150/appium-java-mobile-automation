@@ -21,7 +21,11 @@ jobs:
   android:
     name: API ${{ matrix.api-level }}
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # A healthy run is about nine minutes. The emulator's own shutdown occasionally wedges after
+    # the suite has finished — outside this workflow's control, in the runner action's Terminate
+    # Emulator step — and a generous cap just means burning three quarters of an hour to find
+    # that out. Fail fast instead.
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -105,7 +109,13 @@ jobs:
             appium_pid=$!
             npx wait-on -t 60000 http-get://127.0.0.1:4723/status
             set +e
-            ./gradlew :tests:test -Dmobile.platform=android --stacktrace --no-daemon
+            # A CI emulator on a shared 2-core runner is far slower than a developer's machine,
+            # and the 20s default is marginal there: a login occasionally misses it and reports
+            # "CatalogScreen did not appear". That is the environment being slow, not the app
+            # being wrong, so the honest fix is a timeout that matches the hardware rather than a
+            # retry that hides it.
+            ./gradlew :tests:test -Dmobile.platform=android -Dmobile.timeout.element.seconds=40 \
+              --stacktrace --no-daemon
             status=$?
             set -e
             # Everything holding a handle on the emulator has to go, or the runner's own
@@ -127,6 +137,9 @@ jobs:
             # "The process '/usr/bin/sh' failed with exit code null" after 21/21 tests passed.
             lsof -ti:4723 2>/dev/null | xargs -r kill -9 2>/dev/null || true
             adb forward --remove-all 2>/dev/null || true
+            # Shut the emulator down here, while nothing is holding it, rather than leaving it to
+            # the action's Terminate Emulator step to discover it will not go.
+            adb emu kill 2>/dev/null || true
             exit $status
 
       - name: Upload failure artifacts

@@ -181,19 +181,14 @@ public abstract class BaseScreen {
             // The numeric keypad has no dismiss key at all — just digits and a backspace — so
             // pressing keys cannot work and the checkout payment form stalls with its submit
             // button behind the keypad. Tapping outside is the only thing that closes it.
-            if (isKeyboardShown()) {
-                tapAboveKeyboard();
-            }
+            //
+            // Unconditional, not guarded on isKeyboardShown(). That guard was tried first and the
+            // keypad stayed up: XCUITest reports keyboard state unreliably, so the fallback
+            // skipped itself precisely when it was needed. The tap lands on the inert header, so
+            // running it when no keyboard is up costs nothing.
+            tapAboveKeyboard();
         } catch (RuntimeException e) {
             // No keyboard was showing. Not a problem, and not worth a log line.
-        }
-    }
-
-    private boolean isKeyboardShown() {
-        try {
-            return driver instanceof io.appium.java_client.HasOnScreenKeyboard keyboard && keyboard.isKeyboardShown();
-        } catch (RuntimeException e) {
-            return false;
         }
     }
 
