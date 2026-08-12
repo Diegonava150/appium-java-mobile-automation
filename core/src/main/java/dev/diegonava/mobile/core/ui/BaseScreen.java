@@ -7,6 +7,7 @@ import io.appium.java_client.AppiumBy;
 import io.appium.java_client.AppiumDriver;
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 import org.openqa.selenium.By;
 import org.openqa.selenium.Dimension;
@@ -147,10 +148,28 @@ public abstract class BaseScreen {
         hideKeyboard();
     }
 
+    /**
+     * Dismisses the keyboard, by whichever means the platform actually honours.
+     *
+     * <p>{@code HidesKeyboard.hideKeyboard()} works on Android and quietly does nothing on iOS,
+     * where there is no system-level dismiss — the keyboard goes away when something dismisses it,
+     * usually a return key. XCUITest exposes {@code mobile: hideKeyboard} for exactly this, and it
+     * takes the list of key labels worth trying.
+     *
+     * <p>Getting this wrong is expensive to diagnose because the failure lands somewhere else
+     * entirely: the checkout address form filled in perfectly, then failed with "To Payment button
+     * was not reachable after 8 swipes" — the button was on screen the whole time, behind the
+     * keyboard, where no amount of scrolling could reach it.
+     */
     protected void hideKeyboard() {
         try {
-            if (driver instanceof io.appium.java_client.HidesKeyboard hides) {
-                hides.hideKeyboard();
+            if (isAndroid()) {
+                if (driver instanceof io.appium.java_client.HidesKeyboard hides) {
+                    hides.hideKeyboard();
+                }
+            } else {
+                driver.executeScript(
+                        "mobile: hideKeyboard", Map.of("keys", List.of("return", "Done", "Next", "Go", "Search")));
             }
         } catch (RuntimeException e) {
             // No keyboard was showing. Not a problem, and not worth a log line.
