@@ -218,7 +218,12 @@ an expiry date after which it fails without running.
       excluded. Verified: **0 of 2,523,960 pixels** differ on a second run.
 - [x] **Allure history on GitHub Pages** — [published live](https://diegonava150.github.io/appium-java-mobile-automation/),
       history restored from the previous report so the trend survives.
-- [ ] Hybrid API + UI seeding with REST Assured — not started
+- [x] ~~Hybrid API + UI seeding with REST Assured~~ — **not possible against this app, and that is
+      the finding.** The API base URL came out of the APK bundle; all four endpoints
+      (`initCall`, `item-load`, `remove-item`, `checkout`) return S3 `AccessDenied`. They are
+      write-only telemetry sinks, not a state API — there is no server-side cart to seed. Rejected
+      the alternatives (point it at an unrelated API, stand up a proxy) as props rather than tests.
+      [ADR-007](docs/adr/0007-no-api-seeding.md).
 
 ### What the accessibility audit actually found
 

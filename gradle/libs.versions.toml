@@ -33,6 +33,9 @@ awaitility   = { module = "org.awaitility:awaitility",  version.ref = "awaitilit
 # expected to work — but it is verified explicitly by :tests:allureWiringCheck. See ADR-005.
 allure-jupiter = { module = "io.qameta.allure:allure-jupiter", version.ref = "allure" }
 
+# Declared but unused. The app under test has no readable state API to seed from — its four
+# endpoints are write-only telemetry behind S3. Kept so the trail is visible rather than erased;
+# see ADR-007. If the app ever grows a real API, the layer slots straight in.
 rest-assured    = { module = "io.rest-assured:rest-assured",              version.ref = "restAssured" }
 jackson-bom     = { module = "com.fasterxml.jackson:jackson-bom",         version.ref = "jackson" }
 jackson-databind = { module = "com.fasterxml.jackson.core:jackson-databind" }
