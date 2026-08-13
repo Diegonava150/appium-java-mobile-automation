@@ -4,6 +4,10 @@
 [![Android](https://github.com/Diegonava150/appium-java-mobile-automation/actions/workflows/android.yml/badge.svg)](https://github.com/Diegonava150/appium-java-mobile-automation/actions/workflows/android.yml)
 [![Maestro smoke](https://github.com/Diegonava150/appium-java-mobile-automation/actions/workflows/maestro.yml/badge.svg)](https://github.com/Diegonava150/appium-java-mobile-automation/actions/workflows/maestro.yml)
 
+**📊 [Live Allure report](https://diegonava150.github.io/appium-java-mobile-automation/)** — published
+from every Android run, with history carried forward so trends, retries and performance drift
+accumulate rather than vanishing with the run that produced them.
+
 A cross-platform mobile test framework built around the problems that only exist on a device:
 fragmentation, app lifecycle, in-place upgrades, and flake.
 
@@ -203,13 +207,34 @@ an expiry date after which it fails without running.
       multi-step Settings UI flow that differs by API level. Shipping a fragile version of it
       would have been worse than saying it is not done.
 
-**Week 3 — measurement**
+**Week 3 — measurement, verified on device**
 
-- [ ] Performance gates: cold start via `am start -W`, jank percentiles from `gfxinfo`
-- [ ] Accessibility audit: touch targets, labels, contrast, one TalkBack flow
-- [ ] Hybrid API + UI seeding with REST Assured
-- [ ] Visual regression with per-device baselines
-- [ ] Allure history and flake trend on GitHub Pages
+- [x] **Performance gates** — cold start from `am start -W`, jank percentiles from `gfxinfo`.
+      Measured: median cold start **902 ms** against a 4 s budget, **18.4 %** janky frames against
+      60 %. Asserts on the median of repeated launches and attaches every measurement pass or fail.
+- [x] **Accessibility audit** — touch targets, missing labels, duplicate labels, from Google's ATF
+      rule catalogue reimplemented against the page source. It found real defects (below).
+- [x] **Visual regression** — per-device-profile baselines, per-channel tolerance, status bar
+      excluded. Verified: **0 of 2,523,960 pixels** differ on a second run.
+- [x] **Allure history on GitHub Pages** — [published live](https://diegonava150.github.io/appium-java-mobile-automation/),
+      history restored from the previous report so the trend survives.
+- [ ] Hybrid API + UI seeding with REST Assured — not started
+
+### What the accessibility audit actually found
+
+Real defects in the app under test, not a clean bill of health:
+
+- The **Login button** and both input fields are under the 48 dp minimum target size.
+- The five rating stars are **25 dp** — about half the minimum — and every product tile reuses the
+  same five labels, so a screen reader announces "review star 1" once per product with nothing to
+  tell them apart.
+- **Product tiles announce nothing at all.** The catalog is unusable with TalkBack, and those tiles
+  are unreachable by this framework's own locator strategy for exactly the same reason — which is
+  the argument in [ADR-003](docs/adr/0003-locator-strategy.md) arriving from the other direction.
+
+These are a third-party app's defects and cannot be fixed from here, so the audit gates on *new*
+findings against [a recorded baseline](tests/src/test/resources/a11y-baseline.txt) — the same shape
+as the flake ledger, for the same reason: a check that is red forever gets switched off.
 
 **Week 4 — the AI layer, as instrumentation**
 
@@ -242,6 +267,18 @@ each runs at roughly half speed. **This design is a correctness mechanism first 
 mechanism second.** Real speedup needs genuinely separate hardware: separate runners, a device
 cloud, or physical handsets. Full numbers in
 [ADR-002](docs/adr/0002-device-pool-parallelism.md#postscript-what-two-devices-actually-bought-measured-2026-08-10).
+
+**Visual regression records on CI, it does not yet gate there.** Baselines are per device profile,
+and the committed one is the local emulator (API 36, 420 dpi). CI's API 31 and 34 profiles have no
+baseline, so every CI run records rather than compares. The fix is to download a run's
+`visual-baselines-apiNN` artifact and commit it; that is left as a deliberate step rather than
+committing baselines generated on a run nobody looked at.
+[Details](tests/src/test/resources/visual-baselines/README.md).
+
+**Performance budgets are loose, on purpose.** A software-rendered emulator on a shared two-core
+runner is several times slower than any handset. A threshold tuned locally would fail constantly
+and train everyone to ignore the gate, so these catch a regression of the order that matters — a
+launch that doubles — and the accumulated numbers in the Allure trend are the more useful signal.
 
 **Rotation state-loss is untestable against this app.** The intended scenario was the classic
 Android one — rotate mid-flow, watch the Activity get recreated, see what the app forgot to save.
