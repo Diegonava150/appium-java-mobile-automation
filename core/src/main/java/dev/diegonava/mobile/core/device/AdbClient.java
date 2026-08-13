@@ -134,6 +134,31 @@ public final class AdbClient {
         run("shell", "settings", "put", "system", "font_scale", Double.toString(scale));
     }
 
+    /**
+     * The display's density in dpi.
+     *
+     * <p>Needed to judge touch-target sizes: page-source bounds are in pixels and the guidance is
+     * written in dp, so a fixed assumption reports phantom failures on one device and misses real
+     * ones on another.
+     */
+    public int displayDensityDpi() {
+        // "Physical density: 420" — and possibly an "Override density:" line, which wins.
+        String output = run("shell", "wm", "density");
+        return output.lines()
+                .map(String::strip)
+                .filter(line -> line.contains("density:"))
+                .map(line -> line.substring(line.lastIndexOf(':') + 1).strip())
+                .flatMap(value -> {
+                    try {
+                        return java.util.stream.Stream.of(Integer.parseInt(value));
+                    } catch (NumberFormatException e) {
+                        return java.util.stream.Stream.<Integer>empty();
+                    }
+                })
+                .reduce((first, second) -> second) // an override, if present, is the effective one
+                .orElseThrow(() -> new IllegalStateException("Could not read display density from: " + output));
+    }
+
     public double fontScale() {
         String value = run("shell", "settings", "get", "system", "font_scale").strip();
         return "null".equals(value) ? 1.0d : Double.parseDouble(value);

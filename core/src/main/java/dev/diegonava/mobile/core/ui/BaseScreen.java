@@ -323,6 +323,23 @@ public abstract class BaseScreen {
         driver.perform(List.of(swipe));
     }
 
+    /** The reverse of {@link #swipeUp}, within the same keyboard-safe band. */
+    protected void swipeDown() {
+        Dimension size = driver.manage().window().getSize();
+        int x = size.getWidth() / 2;
+        int startY = (int) (size.getHeight() * 0.15);
+        int endY = (int) (size.getHeight() * 0.45);
+
+        PointerInput finger = new PointerInput(PointerInput.Kind.TOUCH, "finger");
+        Sequence swipe = new Sequence(finger, 0)
+                .addAction(finger.createPointerMove(Duration.ZERO, PointerInput.Origin.viewport(), x, startY))
+                .addAction(finger.createPointerDown(PointerInput.MouseButton.LEFT.asArg()))
+                .addAction(finger.createPointerMove(Duration.ofMillis(400), PointerInput.Origin.viewport(), x, endY))
+                .addAction(finger.createPointerUp(PointerInput.MouseButton.LEFT.asArg()));
+
+        driver.perform(List.of(swipe));
+    }
+
     /** Scrolls the control into view before tapping it — long forms need this. */
     protected void scrollAndTap(By locator) {
         scrollUntilVisible(locator);

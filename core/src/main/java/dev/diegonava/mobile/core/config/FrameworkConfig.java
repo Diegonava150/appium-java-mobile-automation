@@ -203,6 +203,33 @@ public final class FrameworkConfig {
         return Duration.ofSeconds(integer("mobile.timeout.deviceLease.seconds", 300));
     }
 
+    // ------------------------------------------------------------- performance
+
+    /**
+     * How many cold starts to average over. One launch on shared hardware means nothing.
+     */
+    public int startupSamples() {
+        return Math.max(1, integer("mobile.perf.coldStart.samples", 3));
+    }
+
+    /**
+     * Budget for the median cold start.
+     *
+     * <p>The default is deliberately loose. A software-rendered emulator on a shared two-core CI
+     * runner is several times slower than any real handset, so an absolute number tuned on a
+     * developer's machine would fail constantly and teach everyone to ignore the gate. What this
+     * catches is a regression of the order that matters — an app that suddenly takes twice as long
+     * to start — while the recorded numbers accumulate into a trend that is the more useful signal.
+     */
+    public Duration startupBudget() {
+        return Duration.ofMillis(integer("mobile.perf.coldStart.maxMillis", 4000));
+    }
+
+    /** Maximum share of janky frames tolerated. Loose for the same reason as the startup budget. */
+    public double jankBudgetPercent() {
+        return optional("mobile.perf.jank.maxPercent").map(Double::parseDouble).orElse(60d);
+    }
+
     // --------------------------------------------------------------- artifacts
 
     public Path artifactsDir() {

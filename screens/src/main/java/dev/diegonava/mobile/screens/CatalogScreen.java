@@ -56,4 +56,21 @@ public final class CatalogScreen extends BaseScreen {
     public void openSortMenu() {
         tap(SORT);
     }
+
+    /**
+     * Scrolls down through the product list and back up.
+     *
+     * <p>Exists for the rendering budget: measuring jank needs frames to measure, and a list scroll
+     * is both the most frame-intensive thing this app does and the interaction where a user would
+     * actually notice stutter.
+     */
+    public CatalogScreen scrollThroughProducts(int swipes) {
+        for (int i = 0; i < swipes; i++) {
+            swipeUp();
+        }
+        for (int i = 0; i < swipes; i++) {
+            swipeDown();
+        }
+        return this;
+    }
 }

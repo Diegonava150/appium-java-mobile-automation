@@ -1,0 +1,55 @@
+# Accepted accessibility findings — Sauce Labs My Demo App (RN) v1.3.0
+#
+# These are real defects in a third-party app that cannot be fixed from here. They are recorded so
+# the audit can gate on what a suite CAN influence: a regression. Anything found that is not listed
+# below fails the build. See AccessibilityBaseline and ADR-006 — the same shape as the flake ledger,
+# for the same reason: a check that is red forever is a check that gets switched off.
+#
+# Captured on 2026-08-13 against an API 36 emulator at 420dpi. Signatures are rule, element type and
+# label, with no coordinates, so a scrolled list or a different density does not read as new
+# findings.
+#
+# Removing a line is how you assert a fix. Adding one should come with a reason.
+
+# ---------------------------------------------------------------------------
+# Touch targets under the 48dp Material/WCAG 2.1 minimum.
+#
+# The login form is the notable one: the primary action and both input fields are all under the
+# minimum. Measured at 46dp for the fields, so it is marginal rather than egregious — but it is the
+# most important screen in the app to get right.
+# ---------------------------------------------------------------------------
+TOUCH_TARGET_TOO_SMALL :: android.view.ViewGroup :: Login button
+TOUCH_TARGET_TOO_SMALL :: android.widget.EditText :: Username input field
+TOUCH_TARGET_TOO_SMALL :: android.widget.EditText :: Password input field
+TOUCH_TARGET_TOO_SMALL :: android.view.ViewGroup :: bob@example.com-autofill
+TOUCH_TARGET_TOO_SMALL :: android.view.ViewGroup :: alice@example.com (locked out)-autofill
+
+# App chrome, present on every screen.
+TOUCH_TARGET_TOO_SMALL :: android.view.ViewGroup :: open menu
+TOUCH_TARGET_TOO_SMALL :: android.view.ViewGroup :: cart badge
+TOUCH_TARGET_TOO_SMALL :: android.view.ViewGroup :: longpress reset app
+TOUCH_TARGET_TOO_SMALL :: android.view.ViewGroup :: sort button
+
+# Rating stars, 25x25dp — roughly half the minimum, and five of them side by side.
+TOUCH_TARGET_TOO_SMALL :: android.view.ViewGroup :: review star 1
+TOUCH_TARGET_TOO_SMALL :: android.view.ViewGroup :: review star 2
+TOUCH_TARGET_TOO_SMALL :: android.view.ViewGroup :: review star 3
+TOUCH_TARGET_TOO_SMALL :: android.view.ViewGroup :: review star 4
+TOUCH_TARGET_TOO_SMALL :: android.view.ViewGroup :: review star 5
+
+# ---------------------------------------------------------------------------
+# Duplicate labels: every product tile reuses the same five star labels, so a screen reader
+# announces "review star 1" once per product with nothing to distinguish them.
+# ---------------------------------------------------------------------------
+DUPLICATE_LABEL :: android.view.ViewGroup :: review star 1
+DUPLICATE_LABEL :: android.view.ViewGroup :: review star 2
+DUPLICATE_LABEL :: android.view.ViewGroup :: review star 3
+DUPLICATE_LABEL :: android.view.ViewGroup :: review star 4
+DUPLICATE_LABEL :: android.view.ViewGroup :: review star 5
+
+# ---------------------------------------------------------------------------
+# Product tiles are tappable and announce nothing at all. The most consequential finding here:
+# the catalog is unusable with TalkBack, and for exactly the same reason those tiles are
+# unreachable by this framework's locator strategy (ADR-003).
+# ---------------------------------------------------------------------------
+MISSING_LABEL :: android.view.ViewGroup :: <no label>
