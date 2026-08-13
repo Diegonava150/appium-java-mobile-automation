@@ -23,6 +23,8 @@ public final class DriverExtension implements BeforeEachCallback, AfterEachCallb
 
     @Override
     public void beforeEach(ExtensionContext context) {
+        CurrentTest.set(context.getRequiredTestClass().getSimpleName() + "."
+                + context.getRequiredTestMethod().getName());
         DeviceSlot slot = DevicePool.get().lease();
         context.getStore(NAMESPACE).put(SLOT_KEY, slot);
         try {
@@ -42,6 +44,7 @@ public final class DriverExtension implements BeforeEachCallback, AfterEachCallb
             DriverManager.close();
         } finally {
             DevicePool.get().release(slot);
+            CurrentTest.clear();
         }
     }
 }

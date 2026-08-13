@@ -1,0 +1,6 @@
+# Registers the vision fallback with core's ServiceLoader lookup.
+#
+# This file is the entire coupling between core and the AI layer. Remove the :ai module from
+# settings.gradle.kts and core does not fail to compile, does not fail to run, and simply finds
+# no fallback — which is the claim ADR-009 makes and this is what makes it true.
+dev.diegonava.mobile.ai.ClaudeVisionLocator

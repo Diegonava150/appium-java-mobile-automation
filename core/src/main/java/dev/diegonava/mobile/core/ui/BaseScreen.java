@@ -79,11 +79,42 @@ public abstract class BaseScreen {
     // ------------------------------------------------------------- interaction
 
     protected WebElement visible(By locator) {
-        return wait(config.elementTimeout()).until(ExpectedConditions.visibilityOfElementLocated(locator));
+        try {
+            return wait(config.elementTimeout()).until(ExpectedConditions.visibilityOfElementLocated(locator));
+        } catch (TimeoutException e) {
+            return recover(locator, e);
+        }
     }
 
     protected WebElement clickable(By locator) {
-        return wait(config.elementTimeout()).until(ExpectedConditions.elementToBeClickable(locator));
+        try {
+            return wait(config.elementTimeout()).until(ExpectedConditions.elementToBeClickable(locator));
+        } catch (TimeoutException e) {
+            return recover(locator, e);
+        }
+    }
+
+    /**
+     * The one place a locator fallback is ever consulted.
+     *
+     * <p>Three properties are worth being explicit about, because they are what separate this from
+     * the self-healing feature it superficially resembles:
+     *
+     * <ol>
+     *   <li>It runs only after the full explicit wait has already expired. Nothing on the happy
+     *       path touches it, so with no fallback registered — the default, and the case when the
+     *       {@code :ai} module is simply absent — this method is a rethrow and timing is unchanged.
+     *   <li>The original {@link TimeoutException} is what propagates when recovery fails. It names
+     *       the locator and the screen; an exception from the fallback would name neither.
+     *   <li>Success is not free. The implementation in {@code :ai} records the heal as debt with
+     *       the screenshot that justified it, and unrecognised debt fails the build. The run is
+     *       rescued; the change in the app is not hidden. See ADR-009.
+     * </ol>
+     */
+    private WebElement recover(By locator, TimeoutException original) {
+        return LocatorFallback.discover()
+                .flatMap(fallback -> fallback.locate(driver, locator, getClass().getSimpleName()))
+                .orElseThrow(() -> original);
     }
 
     protected List<WebElement> allVisible(By locator) {

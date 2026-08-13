@@ -14,6 +14,7 @@ slf4j            = "2.0.17"
 logback          = "1.6.1"
 awaitility       = "4.3.0"
 spotless         = "8.9.0"
+anthropic        = "2.53.0"  # Official Java SDK. Used only by the optional :ai module.
 
 [libraries]
 appium-java-client = { module = "io.appium:java-client",                 version.ref = "appiumJavaClient" }
@@ -39,6 +40,11 @@ allure-jupiter = { module = "io.qameta.allure:allure-jupiter", version.ref = "al
 rest-assured    = { module = "io.rest-assured:rest-assured",              version.ref = "restAssured" }
 jackson-bom     = { module = "com.fasterxml.jackson:jackson-bom",         version.ref = "jackson" }
 jackson-databind = { module = "com.fasterxml.jackson.core:jackson-databind" }
+jackson-annotations = { module = "com.fasterxml.jackson.core:jackson-annotations" }
+
+# Only the :ai module depends on this. Nothing on the main path imports com.anthropic.*,
+# which is what makes "the AI layer is optional" checkable rather than aspirational.
+anthropic-java = { module = "com.anthropic:anthropic-java", version.ref = "anthropic" }
 
 slf4j-api       = { module = "org.slf4j:slf4j-api",           version.ref = "slf4j" }
 logback-classic = { module = "ch.qos.logback:logback-classic", version.ref = "logback" }

@@ -12,6 +12,12 @@ dependencies {
 
     testRuntimeOnly(libs.junit.platform.launcher)
     testRuntimeOnly(libs.logback.classic)
+
+    // Runtime only, and inert unless -Dmobile.ai.locatorFallback=true is set with a key present.
+    // On the runtime classpath rather than the compile one on purpose: no test can import an
+    // AI type, so nothing here can come to depend on the layer being there. Delete the line and
+    // the suite still compiles and still runs. See ADR-009.
+    testRuntimeOnly(project(":ai"))
 }
 
 /**

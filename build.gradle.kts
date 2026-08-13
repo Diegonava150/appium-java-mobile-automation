@@ -184,4 +184,10 @@ val qualityGate = tasks.register("qualityGate") {
     dependsOn(subprojects.map { "${it.path}:compileJava" })
     dependsOn(subprojects.map { "${it.path}:compileTestJava" })
     dependsOn(":core:test")
+
+    // The AI layer's unit tests need no key and no network — they cover the credential
+    // resolution, the prompt, the hierarchy digest and the locator policy gate, which is
+    // everything about that module except the HTTP call in the middle. Leaving them out of
+    // the gate would mean the one part of the AI layer that *is* verifiable never runs in CI.
+    dependsOn(":ai:test")
 }
