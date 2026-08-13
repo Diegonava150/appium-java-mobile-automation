@@ -1,0 +1,109 @@
+name: Report
+
+# Publishes the Allure report to GitHub Pages, carrying history forward between runs.
+#
+# History is the whole point. A single report tells you whether one run passed; a report with
+# history tells you which tests have been unstable, whether cold start is drifting, and whether a
+# quarantined test has quietly stopped needing its retries. Those are the questions worth asking,
+# and none of them can be answered by a run in isolation.
+#
+# Runs after the Android workflow rather than inside it: there are two matrix legs producing
+# results, and they have to be merged before a report means anything.
+
+on:
+  workflow_run:
+    workflows: ["Android"]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: report
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish Allure report
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download every Allure result from the triggering run
+        uses: actions/download-artifact@v4
+        with:
+          pattern: allure-results-*
+          path: downloaded
+          merge-multiple: true
+          run-id: ${{ github.event.workflow_run.id || github.run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
+
+      - name: Stop early if the run produced no results
+        id: check
+        run: |
+          if [ -d downloaded ] && [ -n "$(ls -A downloaded 2>/dev/null)" ]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            echo "No Allure results in this run — nothing to publish."
+          fi
+
+      # The previous report's history directory is what turns a series of isolated reports into a
+      # trend. Without this step every report claims to be the first one ever run.
+      - name: Restore history from the published report
+        if: steps.check.outputs.found == 'true'
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          path: gh-pages
+        continue-on-error: true
+
+      - name: Carry history forward
+        if: steps.check.outputs.found == 'true'
+        run: |
+          if [ -d gh-pages/history ]; then
+            cp -r gh-pages/history downloaded/history
+            echo "Carried forward $(ls gh-pages/history | wc -l) history file(s)."
+          else
+            echo "No previous history — this will be the first report in the series."
+          fi
+
+      - name: Set up JDK 21
+        if: steps.check.outputs.found == 'true'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Generate the report
+        if: steps.check.outputs.found == 'true'
+        run: |
+          npm install -g allure-commandline
+          allure generate downloaded --clean -o allure-report
+          # Name the run in the report rather than leaving it as an opaque number.
+          cat > allure-report/executor.json <<JSON
+          {
+            "name": "GitHub Actions",
+            "type": "github",
+            "buildName": "Android #${{ github.event.workflow_run.run_number || github.run_number }}",
+            "buildUrl": "${{ github.event.workflow_run.html_url || github.server_url }}",
+            "reportUrl": "${{ github.server_url }}/${{ github.repository }}"
+          }
+          JSON
+
+      - name: Publish to GitHub Pages
+        if: steps.check.outputs.found == 'true'
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: allure-report
+          publish_branch: gh-pages
+          keep_files: false
+          user_name: github-actions[bot]
+          user_email: github-actions[bot]@users.noreply.github.com
+          commit_message: "report: Android run ${{ github.event.workflow_run.run_number || github.run_number }}"

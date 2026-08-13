@@ -165,3 +165,14 @@ jobs:
           path: tests/build/allure-results
           retention-days: 14
           if-no-files-found: ignore
+
+      # Kept out of the Allure results directory on purpose — allure generate reads everything in
+      # there, and a stray JSON of a different shape is asking for trouble.
+      - name: Upload the flake ledger
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: flake-ledger-api${{ matrix.api-level }}
+          path: tests/build/flake-report.json
+          retention-days: 30
+          if-no-files-found: ignore
