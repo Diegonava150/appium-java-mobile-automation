@@ -31,7 +31,25 @@ public final class CheckoutPaymentScreen extends BaseScreen {
         scrollAndType(CARD_NUMBER, card.number());
         scrollAndType(EXPIRY, card.expiry());
         scrollAndType(SECURITY_CODE, card.securityCode());
+        dismissNumericKeypad();
         return this;
+    }
+
+    /**
+     * Gets the numeric keypad off the screen by swapping it for a keyboard that can be dismissed.
+     *
+     * <p>The Security Code field raises the numeric keypad. On iOS that keypad has no return key,
+     * no Done key, and this app installs no tap-outside handler for it — so there is genuinely no
+     * way to dismiss it directly, and it sits over the Review Order button. Pressing keys cannot
+     * work, tapping outside does not work, and scrolling cannot help because the button is behind
+     * the keypad rather than below the fold.
+     *
+     * <p>Focusing a plain text field swaps the keypad for the alphabetic keyboard, which does have
+     * a return key. That is the move a real user makes, and it is the only one available.
+     */
+    private void dismissNumericKeypad() {
+        tap(FULL_NAME);
+        hideKeyboard();
     }
 
     /**

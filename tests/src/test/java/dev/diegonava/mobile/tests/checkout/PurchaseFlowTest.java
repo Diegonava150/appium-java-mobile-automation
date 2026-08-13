@@ -2,6 +2,7 @@ package dev.diegonava.mobile.tests.checkout;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import dev.diegonava.mobile.core.junit.Flaky;
 import dev.diegonava.mobile.core.junit.MobileTest;
 import dev.diegonava.mobile.screens.App;
 import dev.diegonava.mobile.screens.CartScreen;
@@ -77,7 +78,13 @@ class PurchaseFlowTest {
                 .isTrue();
     }
 
-    @Test
+    @Flaky(
+            maxAttempts = 2,
+            reason = "heaviest test in the suite - login, catalog, cart and checkout in one - and on"
+                    + " a shared two-core CI emulator the drawer animation plus the login round-trip"
+                    + " intermittently outruns even the 40s CI element timeout. Seen twice on API 34,"
+                    + " never on API 31, never locally. Environment speed, not app behaviour.",
+            expires = "2026-09-30")
     @Severity(SeverityLevel.NORMAL)
     @DisplayName("the address form refuses to advance while required fields are empty")
     void addressFormValidatesRequiredFields() {
