@@ -131,6 +131,52 @@ public final class FrameworkConfig {
         return bool("mobile.ios.autoDismissAlerts", true);
     }
 
+    /**
+     * How long XCUITest waits for a simulator to finish booting.
+     *
+     * <p>Appium's default is 120 s, and on a shared macOS CI runner that is too tight. A run
+     * failed on exactly it: <i>"The simulator … has failed to finish booting after 128 s"</i>,
+     * thrown as a {@code SessionNotCreatedException} partway through the suite, after 27 of 28
+     * tests had passed. The workflow pre-boots the simulator before Appium starts, so this was a
+     * re-boot mid-run on a machine that was already busy, not a cold start.
+     *
+     * <p>Raising the ceiling does not fix a simulator that has genuinely wedged; it removes the
+     * case where a slow boot is misread as a broken one. Those two look identical in a log and
+     * need opposite responses, which is why the number is worth stating rather than inheriting.
+     */
+    public Duration iosSimulatorStartupTimeout() {
+        return Duration.ofSeconds(integer("mobile.ios.simulatorStartupTimeout.seconds", 240));
+    }
+
+    /**
+     * How long the HTTP client waits for a single Appium command, session creation included.
+     *
+     * <p>This has to be the largest number in the timeout stack, and getting that wrong is how
+     * the iOS lane failed twice in a row. Selenium's {@code JdkHttpClient} defaults to a three
+     * minute read timeout. Nobody set it, so nobody noticed that it sat <em>below</em> the
+     * framework's own 240 s {@code wdaLaunchTimeout} — which meant that ceiling could never
+     * actually be reached. Session creation on iOS ran past three minutes and the client gave up
+     * first, surfacing as a bare {@code java.util.concurrent.TimeoutException} inside a
+     * {@code SessionNotCreatedException} with a null message: an error that names nothing at all.
+     *
+     * <p>It is precisely the pathology ADR-004 describes for implicit and explicit waits, one
+     * layer down. Several timeouts govern the same operation, the effective one is whichever is
+     * smallest, and the smallest was the one nobody had chosen. The ladder is now deliberate and
+     * ordered, longest last:
+     *
+     * <pre>
+     *   element wait          20 s   what a test waits for a control
+     *   newCommandTimeout    120 s   server-side idle-session reaper
+     *   wdaLaunchTimeout     240 s   WebDriverAgent coming up
+     *   simulatorStartup     240 s   a simulator booting
+     *   session (this)       420 s   the client's patience — must exceed the sum of a boot
+     *                                followed by a WDA launch, not merely the larger of them
+     * </pre>
+     */
+    public Duration sessionTimeout() {
+        return Duration.ofSeconds(integer("mobile.timeout.session.seconds", 420));
+    }
+
     // --------------------------------------------------------------------- app
 
     /**

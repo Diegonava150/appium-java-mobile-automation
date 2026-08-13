@@ -2,9 +2,18 @@ name: iOS
 
 # The parity claim only means something if both halves actually run. This is the other half.
 #
-# NOTE: this workflow has not been executed — the framework was developed on Windows, so the
-# iOS suite has only ever been compiled, never run. The simulator lane is expected to need
-# adjustment on its first real run. See "Known limitations" in the README.
+# It does run, and it took six rounds to get there — every diagnosis made from the failure
+# artifacts this job uploads, on a Windows machine with no Mac attached. The three that mattered:
+# XCUITest computes visibility from an element's own frame, so React Native's zero-size container
+# wrappers report invisible while their children are plainly on screen; iOS offers to save the
+# password after a sign-in, and that system dialog floats above the catalog and makes every row
+# untappable; and the numeric keypad has no dismiss key, so the only thing that closes it is a tap
+# outside.
+#
+# The remaining known fragility is the simulator itself. A run failed with
+# "the simulator has failed to finish booting after 128s" partway through the suite, after 27 of
+# 28 tests had passed — Appium's 120 s default is too tight for a shared runner. See
+# mobile.ios.simulatorStartupTimeout.seconds.
 
 on:
   push:

@@ -57,6 +57,12 @@ public final class CapabilityFactory {
                 .setNewCommandTimeout(config.commandTimeout())
                 .setWdaLaunchTimeout(Duration.ofSeconds(240))
                 .setWdaConnectionTimeout(Duration.ofSeconds(240))
+                // Appium's default is 120 s. A CI run failed on exactly that ceiling —
+                // "the simulator has failed to finish booting after 128s" — partway through the
+                // suite, after 27 tests had passed, on a runner that pre-boots the simulator
+                // before Appium ever starts. A slow boot and a wedged boot look identical in the
+                // log and need opposite responses; this removes the first from the picture.
+                .setSimulatorStartupTimeout(config.iosSimulatorStartupTimeout())
                 // Reuse the existing WDA rather than reinstalling it per session.
                 .setUsePrebuiltWda(false)
                 .setUseNewWDA(false)

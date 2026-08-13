@@ -194,13 +194,28 @@ device-free unit tests. [ADR-005](docs/adr/0005-junit-6-and-allure.md).
 - [x] Quality gate, Java 21 and 25 — green, ~1 minute
 - [x] Android emulator matrix, API 31 and 34 — **green, 21/21, ~8½ minutes**
 - [x] Maestro smoke — green, ~4 minutes
-- [x] iOS simulator — **13 pass, 8 correctly skipped as Android-only, 1 quarantined**, ~40 minutes
+- [~] iOS simulator — **14 pass, 13 skipped as Android-only, 1 failing on session creation**,
+      ~40 minutes. Green earlier in the week; currently red for the reason below, with a fix in
+      flight.
 
 iOS went 0 → passing over six CI rounds, every diagnosis made from the failure-artifact bundle
-rather than by guesswork. The remaining quarantined test is
-[ADR-006](docs/adr/0006-flake-as-a-debt-ledger.md) doing its job on a real case: drawer navigation
-intermittently outruns the element timeout on loaded CI hardware, with a mechanism-level reason and
-an expiry date after which it fails without running.
+rather than by guesswork.
+
+**The current failure is a framework bug, and a good one.** The same test died twice in a row on
+`SessionNotCreatedException` — once as *"the simulator has failed to finish booting after 128s"*,
+once as a bare `java.util.concurrent.TimeoutException` with no message at all. Different symptoms,
+one cause: **Selenium's `JdkHttpClient` defaults to a three-minute read timeout, and nobody had set
+it — so it sat below this framework's own 240 s `wdaLaunchTimeout`, which meant that ceiling could
+never be reached.** Session creation on a loaded macOS runner ran past three minutes and the client
+gave up first.
+
+That is exactly the pathology [ADR-004](docs/adr/0004-explicit-waits-only.md) describes for
+implicit and explicit waits, one layer down: several timeouts govern one operation, the effective
+one is whichever is smallest, and the smallest was the one nobody had chosen. The stack is now
+deliberate and ordered — element wait 20 s, `newCommandTimeout` 120 s, WDA launch 240 s, simulator
+boot 240 s, HTTP client 420 s — with [a unit test asserting the
+ordering](core/src/test/java/dev/diegonava/mobile/core/config/FrameworkConfigTest.java) rather than
+the individual numbers, because the ordering is the invariant that was violated.
 
 **Week 2 — not done**
 

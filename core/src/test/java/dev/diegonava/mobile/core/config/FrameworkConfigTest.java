@@ -34,6 +34,44 @@ class FrameworkConfigTest {
     }
 
     @Test
+    @DisplayName("the timeout stack is ordered — the client outlasts every ceiling beneath it")
+    void timeoutStackIsOrdered() {
+        // This is the assertion that would have caught the bug. The iOS lane failed twice because
+        // Selenium's unset default read timeout (180s) sat *below* wdaLaunchTimeout (240s), so
+        // that ceiling could never be reached and the client gave up first with an error that
+        // named nothing. Several timeouts govern one operation and the smallest wins — which is
+        // ADR-004's argument about implicit waits, one layer down.
+        FrameworkConfig config = FrameworkConfig.get();
+
+        assertThat(config.sessionTimeout())
+                .as("the client must outlast a simulator boot followed by a WDA launch")
+                .isGreaterThan(config.iosSimulatorStartupTimeout().plus(config.commandTimeout()));
+
+        assertThat(config.iosSimulatorStartupTimeout().toSeconds())
+                .as("Appium's own default is 120s, and a run failed at 128s")
+                .isGreaterThan(120);
+
+        assertThat(config.elementTimeout())
+                .as("an element wait is the shortest thing in the stack, by a wide margin")
+                .isLessThan(config.commandTimeout());
+    }
+
+    @Test
+    @DisplayName("both new timeouts are configurable like everything else")
+    void newTimeoutsAreConfigurable() {
+        System.setProperty("mobile.ios.simulatorStartupTimeout.seconds", "45");
+        System.setProperty("mobile.timeout.session.seconds", "99");
+        try {
+            assertThat(FrameworkConfig.get().iosSimulatorStartupTimeout().toSeconds())
+                    .isEqualTo(45);
+            assertThat(FrameworkConfig.get().sessionTimeout().toSeconds()).isEqualTo(99);
+        } finally {
+            System.clearProperty("mobile.ios.simulatorStartupTimeout.seconds");
+            System.clearProperty("mobile.timeout.session.seconds");
+        }
+    }
+
+    @Test
     @DisplayName("numeric and boolean values are coerced from their string form")
     void coercesTypes() {
         System.setProperty("mobile.timeout.element.seconds", "45");

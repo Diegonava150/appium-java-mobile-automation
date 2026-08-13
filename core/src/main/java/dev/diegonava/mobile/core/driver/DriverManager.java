@@ -7,6 +7,7 @@ import io.appium.java_client.AppiumDriver;
 import io.appium.java_client.android.AndroidDriver;
 import io.appium.java_client.ios.IOSDriver;
 import java.net.URL;
+import org.openqa.selenium.remote.http.ClientConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -70,9 +71,18 @@ public final class DriverManager {
         log.info("Opening {} session on {} via {}", platform, slot.label(), endpoint);
         long startedAt = System.nanoTime();
 
+        // Built explicitly rather than letting the URL constructor supply a default one. The
+        // default carries Selenium's three minute read timeout, which sat below this framework's
+        // own 240s wdaLaunchTimeout — so that ceiling could never be reached, and a slow iOS
+        // session creation surfaced as a bare TimeoutException naming nothing. See
+        // FrameworkConfig.sessionTimeout() for the ordering this now follows.
+        ClientConfig clientConfig = ClientConfig.defaultConfig()
+                .baseUrl(endpoint)
+                .readTimeout(FrameworkConfig.get().sessionTimeout());
+
         AppiumDriver driver = platform.isAndroid()
-                ? new AndroidDriver(endpoint, CapabilityFactory.forSlot(platform, slot))
-                : new IOSDriver(endpoint, CapabilityFactory.forSlot(platform, slot));
+                ? new AndroidDriver(clientConfig, CapabilityFactory.forSlot(platform, slot))
+                : new IOSDriver(clientConfig, CapabilityFactory.forSlot(platform, slot));
 
         // No implicit wait, deliberately. Implicit and explicit waits interact badly — the
         // combination produces timeouts that are neither value and are miserable to debug.
