@@ -1,5 +1,6 @@
 package dev.diegonava.mobile.core.ai;
 
+import dev.diegonava.mobile.core.config.FrameworkConfig;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -38,6 +39,13 @@ public final class LocatorDebtLedger {
     private static final String RESOURCE = "locator-debt.txt";
 
     private static final Map<String, LocatorHealingEvent> RECORDED = new ConcurrentHashMap<>();
+
+    static {
+        // Written from a shutdown hook, like the flake ledger, so the file exists even when the
+        // run ends badly — a suite that died halfway is exactly when you want to know which
+        // locators were already being carried.
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> writeReport(reportPath()), "locator-debt-writer"));
+    }
 
     private final Set<String> accepted;
 
@@ -121,7 +129,18 @@ public final class LocatorDebtLedger {
                         """.formatted(debt.size()), System.lineSeparator()));
     }
 
-    /** Writes the run's heals for CI to keep, whether or not the build failed on them. */
+    /** Where the run's heals are written. {@code ./gradlew checkLocatorDebt} reads this file. */
+    public static Path reportPath() {
+        return Path.of(FrameworkConfig.get().string("mobile.ai.debtReport", "build/locator-debt-report.txt"))
+                .toAbsolutePath();
+    }
+
+    /**
+     * Writes the run's heals for CI to keep, whether or not the build failed on them.
+     *
+     * <p>Signature first, so {@code checkLocatorDebt} can compare against {@code locator-debt.txt}
+     * by reading one field rather than reassembling it.
+     */
     public static void writeReport(Path target) {
         if (RECORDED.isEmpty()) {
             return;
@@ -129,13 +148,8 @@ public final class LocatorDebtLedger {
         try {
             Files.createDirectories(target.getParent());
             String content = RECORDED.values().stream()
-                    .map(event -> "%s|%s|%s|%s|%s"
-                            .formatted(
-                                    event.testId(),
-                                    event.screen(),
-                                    event.failedLocator(),
-                                    event.resolvedBy(),
-                                    event.evidence()))
+                    .map(event -> "%s|%s|%s|%s"
+                            .formatted(event.signature(), event.testId(), event.resolvedBy(), event.evidence()))
                     .sorted()
                     .collect(Collectors.joining(System.lineSeparator()));
             Files.writeString(target, content, StandardCharsets.UTF_8);

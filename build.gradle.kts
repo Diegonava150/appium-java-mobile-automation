@@ -165,6 +165,91 @@ val checkNoXPath = tasks.register("checkNoXPath") {
 }
 
 // ---------------------------------------------------------------------------
+// Locator debt — the gate that makes AI healing cost something (ADR-009)
+// ---------------------------------------------------------------------------
+
+/**
+ * Fails when the AI fallback rescued a locator that is not in the accepted set.
+ *
+ * This is the whole argument of the AI layer expressed as a build task. Healing keeps the run
+ * alive; this makes sure it does not also keep the app change invisible. The failure names each
+ * locator and points at the screenshot the fallback based its answer on, so fixing it is a
+ * matter of opening an image rather than reproducing a twenty-minute device run.
+ *
+ * It also reports the reverse: accepted entries that nothing rescued. Those locators have been
+ * fixed or deleted upstream, and leaving their lines in place is how an exemption list stops
+ * meaning anything.
+ *
+ * Runs after `:tests:test` rather than inside `qualityGate` — with no device there are no
+ * locators to heal, so there is nothing for it to check.
+ */
+val checkLocatorDebt = tasks.register("checkLocatorDebt") {
+    group = "verification"
+    description = "Fails on AI-healed locators that are not in tests/src/test/resources/locator-debt.txt."
+
+    val reportFile = layout.buildDirectory.file("locator-debt-report.txt")
+    val acceptedFile = file("tests/src/test/resources/locator-debt.txt")
+
+    inputs.files(reportFile).optional()
+    inputs.file(acceptedFile)
+
+    doLast {
+        val report = reportFile.get().asFile
+        if (!report.exists()) {
+            logger.lifecycle("No locators were healed this run. Nothing to reconcile.")
+            return@doLast
+        }
+
+        // A byte-order mark on the first line would make an accepted signature silently fail to
+        // match its own entry — the worst possible failure for this task, since it reads as
+        // "you did not accept that" rather than as an encoding problem. Both files are
+        // hand-edited on Windows often enough for this to be worth two lines.
+        fun String.withoutBom() = removePrefix("﻿")
+
+        // Report lines are `signature|testId|resolvedBy|evidence`, signature first precisely so
+        // this comparison reads one field instead of reassembling it.
+        val healed = report.readLines()
+            .filter { it.isNotBlank() }
+            .associate { line -> line.withoutBom().substringBefore('|') to line.withoutBom().split('|') }
+
+        val accepted = acceptedFile.readLines()
+            .map { it.withoutBom().trim() }
+            .filter { it.isNotEmpty() && !it.startsWith("#") }
+            .toSet()
+
+        val stale = accepted - healed.keys
+        if (stale.isNotEmpty()) {
+            logger.warn("")
+            logger.warn("${stale.size} accepted locator(s) needed no rescue this run. Delete their lines:")
+            stale.forEach { logger.warn("  $it") }
+        }
+
+        val unaccepted = healed.filterKeys { it !in accepted }
+        if (unaccepted.isEmpty()) {
+            logger.lifecycle("Locator debt reconciled: ${healed.size} heal(s), all accepted.")
+            return@doLast
+        }
+
+        throw GradleException(
+            buildString {
+                appendLine("${unaccepted.size} locator(s) were rescued by the AI fallback and are not accepted.")
+                appendLine()
+                appendLine("The run was kept alive on credit (ADR-009). Each of these is a locator in the")
+                appendLine("source that no longer matches the app. Fix it, or accept it explicitly with a")
+                appendLine("reason and an owner in tests/src/test/resources/locator-debt.txt.")
+                appendLine()
+                unaccepted.forEach { (signature, fields) ->
+                    appendLine("  $signature")
+                    appendLine("      in test:    ${fields.getOrElse(1) { "?" }}")
+                    appendLine("      rescued by: ${fields.getOrElse(2) { "?" }}")
+                    appendLine("      screenshot: ${fields.getOrElse(3) { "?" }}")
+                }
+            },
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Quality gate — everything that runs without a device
 // ---------------------------------------------------------------------------
 

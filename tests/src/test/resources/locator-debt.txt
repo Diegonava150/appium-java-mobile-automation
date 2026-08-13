@@ -1,0 +1,22 @@
+# Locators the AI fallback is currently allowed to rescue.
+#
+# One signature per line, in the form the ledger writes it:
+#
+#     ScreenClassName :: By.AppiumBy$ByAccessibilityId: some testID
+#
+# Every heal not listed here fails the build, naming the locator and attaching the screenshot
+# the fallback based its answer on. Adding a line is therefore a deliberate act: it says
+# "yes, this locator is broken, and we are choosing to carry it for now."
+#
+# Put the reason and the owner in a comment above the entry. An entry with no reason is
+# indistinguishable from an entry nobody remembers adding, which is how a quarantine list
+# turns into a permanent exemption.
+#
+#   # renamed in RN 0.74 upgrade; waiting on the app team — diego, 2026-08-13
+#   CartScreen :: By.AppiumBy$ByAccessibilityId: cart tab
+#
+# `./gradlew checkLocatorDebt` also reports accepted entries that nothing rescued this run.
+# Those have been fixed or deleted upstream and their lines should come out — otherwise this
+# file only ever grows, and stops meaning anything.
+#
+# It is empty, and the healthy state is that it stays empty.

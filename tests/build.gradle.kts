@@ -71,4 +71,16 @@ tasks.named<Test>("test") {
         "mobile.artifacts.dir",
         layout.buildDirectory.dir("test-artifacts").get().asFile.absolutePath,
     )
+
+    // Where the AI layer's shutdown hook writes the run's heals, and where checkLocatorDebt
+    // looks for them. Under the root build directory because the task that reconciles them
+    // against the committed accepted set lives in the root build.
+    systemProperty(
+        "mobile.ai.debtReport",
+        rootProject.layout.buildDirectory.file("locator-debt-report.txt").get().asFile.absolutePath,
+    )
+
+    // finalizedBy, not dependsOn: the reconciliation has to happen even when the suite fails,
+    // because a run that failed on a locator is exactly the run whose heals are worth reading.
+    finalizedBy(":checkLocatorDebt")
 }
