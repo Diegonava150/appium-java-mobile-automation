@@ -75,7 +75,7 @@ appium driver install uiautomator2
 Then:
 
 ```bash
-# Emulator-free: format, compile, 99 unit tests, locator policy. ~10s, no secrets.
+# Emulator-free: format, compile, 113 unit tests, locator policy. ~10s, no secrets.
 ./gradlew qualityGate
 
 # Fetch both builds under test (never committed — ADR-001)
@@ -256,20 +256,28 @@ as the flake ledger, for the same reason: a check that is red forever gets switc
       through `ServiceLoader`; `:ai` is on the test *runtime* classpath only. Delete
       `include("ai")` and the framework still compiles and runs.
 - [x] **`appium-mcp` wired** (`.mcp.json`) plus a `CLAUDE.md` of the invariants the build enforces
-- [ ] Failure triage over the screenshot + hierarchy + logcat bundle
+- [x] **Failure triage** over the screenshot + hierarchy + logcat bundle — `./gradlew
+      triageFailures` writes a `triage.md` beside each failure. Offline on purpose, so it works on
+      artifacts *downloaded from CI*, which is the case that matters: the failures worth triaging
+      happened on hardware you do not have. The prompt asks for a hypothesis with its evidence
+      cited, forbids recommending a retry, and names "a system dialog covering the control" as a
+      category to look for — the failure mode most often misdiagnosed as flakiness, and the one
+      that actually cost this project six CI rounds on iOS.
 
 Off by default — `-Dmobile.ai.locatorFallback=true` **and** a key. A test run should not start
 making network calls on the strength of an exported environment variable. Cloning this repo and
 running it green must never require an Anthropic account, and does not.
 
-> **What is verified, and what is not.** 35 unit tests cover credential resolution and redaction,
-> the prompt, the hierarchy digest, and the policy gate — no key, no network, wired into
-> `qualityGate`. The three paths of `checkLocatorDebt` (fails on unaccepted, passes on accepted,
-> warns on stale) were verified by hand against a synthetic report. **The live API call has never
-> been executed** — I have no key — so nothing here should be read as a claim that the vision
-> fallback has been shown to work against a real device. The parts that decide what is asked and
-> what is done with the answer are testable and tested; the HTTP call in the middle is deliberately
-> thin for exactly that reason. [ADR-009](docs/adr/0009-ai-as-instrumentation-not-self-healing.md).
+> **What is verified, and what is not.** 49 unit tests cover credential resolution and redaction,
+> the prompts, the hierarchy digest, the logcat tail, bundle discovery, and the locator policy
+> gate — no key, no network, wired into `qualityGate`. The three paths of `checkLocatorDebt`
+> (fails on unaccepted, passes on accepted, warns on stale) were verified by hand against a
+> synthetic report, and `triageFailures` was run end to end against real artifact bundles on its
+> no-key path. **The live API calls have never been executed** — I have no key — so nothing here
+> should be read as a claim that the vision fallback or the triage output has been shown to work.
+> The parts that decide what is asked and what is done with the answer are testable and tested;
+> the HTTP call in the middle is deliberately thin for exactly that reason.
+> [ADR-009](docs/adr/0009-ai-as-instrumentation-not-self-healing.md).
 
 ### Why not conventional self-healing
 
