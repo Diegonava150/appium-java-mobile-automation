@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "appium": {
+      "command": "npx",
+      "args": ["-y", "appium-mcp@1.92.2"]
+    }
+  }
+}

@@ -75,7 +75,7 @@ appium driver install uiautomator2
 Then:
 
 ```bash
-# Emulator-free: format, compile, 20 unit tests, locator policy. ~10s, no secrets.
+# Emulator-free: format, compile, 99 unit tests, locator policy. ~10s, no secrets.
 ./gradlew qualityGate
 
 # Fetch both builds under test (never committed — ADR-001)
@@ -108,6 +108,7 @@ variable, then `mobile.properties`, then the built-in default. Copy
 core/       driver lifecycle, device pool, adb client, JUnit extensions, flake ledger, locators
 screens/    screen objects — one class per screen, no assertions
 tests/      smoke (parity) · checkout · conditions · upgrade
+ai/         optional vision fallback — implements an SPI core declares; delete it and nothing breaks
 maestro/    YAML smoke flows for the fast gate
 build-logic/ Gradle convention plugins
 docs/adr/   why things are the way they are
@@ -243,13 +244,45 @@ as the flake ledger, for the same reason: a check that is red forever gets switc
 
 **Week 4 — the AI layer, as instrumentation**
 
-- [ ] Vision-fallback locator emitting a **locator-debt report** that fails on new debt — healing
-      keeps the run alive, the ledger makes you pay it back
+- [x] **Vision fallback for a locator that stopped matching**, and — the part that matters — a
+      **locator-debt ledger that fails the build on any heal nobody accepted**, naming the locator,
+      the test, the replacement, and the screenshot the answer was based on
+- [x] **The model cannot widen the locator policy.** Its answer passes a gate that permits
+      `accessibility id` and `id` and refuses everything else. Shown a page source, a model will
+      suggest `//android.widget.Button[3]` — the locator most likely to match and the worst thing
+      to admit into a suite. `checkNoXPath` guards the source tree; this guards runtime, which is
+      the one place the static check can never look.
+- [x] **Optional by construction, not by claim** — `core` declares the interface and resolves it
+      through `ServiceLoader`; `:ai` is on the test *runtime* classpath only. Delete
+      `include("ai")` and the framework still compiles and runs.
+- [x] **`appium-mcp` wired** (`.mcp.json`) plus a `CLAUDE.md` of the invariants the build enforces
 - [ ] Failure triage over the screenshot + hierarchy + logcat bundle
-- [ ] `appium-mcp` wiring so an agent can drive a live emulator to draft screen objects
 
-All of it stays behind `@Tag("ai")` and degrades gracefully with no API key. Cloning this repo and
-running it green must never require an Anthropic account.
+Off by default — `-Dmobile.ai.locatorFallback=true` **and** a key. A test run should not start
+making network calls on the strength of an exported environment variable. Cloning this repo and
+running it green must never require an Anthropic account, and does not.
+
+> **What is verified, and what is not.** 35 unit tests cover credential resolution and redaction,
+> the prompt, the hierarchy digest, and the policy gate — no key, no network, wired into
+> `qualityGate`. The three paths of `checkLocatorDebt` (fails on unaccepted, passes on accepted,
+> warns on stale) were verified by hand against a synthetic report. **The live API call has never
+> been executed** — I have no key — so nothing here should be read as a claim that the vision
+> fallback has been shown to work against a real device. The parts that decide what is asked and
+> what is done with the answer are testable and tested; the HTTP call in the middle is deliberately
+> thin for exactly that reason. [ADR-009](docs/adr/0009-ai-as-instrumentation-not-self-healing.md).
+
+### Why not conventional self-healing
+
+It is the headline feature of most commercial tools in this space, and it is an anti-feature. A
+locator breaks for a reason — usually a renamed `testID`, a moved control, a replaced component,
+which is exactly the change the suite exists to detect. A tool that silently repairs the locator
+has not fixed the test; it has deleted the report. Run it for a year and the suite is green and
+nobody can say what it asserts.
+
+The useful half is real, though: a twenty-minute suite that dies on its first assertion leaves
+nineteen tests unrun, and finding the other eight problems takes eight more runs. So healing here
+buys that one thing and buys it on credit — every heal recorded, the accepted set committed, and
+new debt failing the build with the evidence attached.
 
 ---
 
