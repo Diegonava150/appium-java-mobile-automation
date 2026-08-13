@@ -166,6 +166,19 @@ jobs:
           retention-days: 14
           if-no-files-found: ignore
 
+      # Visual baselines are per device profile, and CI's profiles are not the developer's. On a
+      # profile with no committed baseline the suite records one and passes rather than failing,
+      # so this uploads whatever it recorded — commit them to turn recording into real gating for
+      # that profile. See tests/src/test/resources/visual-baselines/README.md.
+      - name: Upload any recorded visual baselines
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-baselines-api${{ matrix.api-level }}
+          path: tests/src/test/resources/visual-baselines
+          retention-days: 14
+          if-no-files-found: ignore
+
       # Kept out of the Allure results directory on purpose — allure generate reads everything in
       # there, and a stray JSON of a different shape is asking for trouble.
       - name: Upload the flake ledger
