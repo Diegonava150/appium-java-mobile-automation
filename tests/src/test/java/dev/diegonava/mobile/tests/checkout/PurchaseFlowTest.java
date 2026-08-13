@@ -79,11 +79,13 @@ class PurchaseFlowTest {
     }
 
     @Flaky(
-            maxAttempts = 2,
-            reason = "heaviest test in the suite - login, catalog, cart and checkout in one - and on"
-                    + " a shared two-core CI emulator the drawer animation plus the login round-trip"
-                    + " intermittently outruns even the 40s CI element timeout. Seen twice on API 34,"
-                    + " never on API 31, never locally. Environment speed, not app behaviour.",
+            maxAttempts = 3,
+            reason = "opening the drawer and tapping through to login intermittently outruns the"
+                    + " element timeout on loaded CI hardware. Three distinct symptoms so far -"
+                    + " 'CatalogScreen did not appear', 'open menu to be clickable', 'menu item log in"
+                    + " to be clickable' - all in the same navigation, all timeouts rather than wrong"
+                    + " behaviour. Never reproduced locally. The same navigation succeeds in other"
+                    + " tests within the same run, which is what rules out a real defect.",
             expires = "2026-09-30")
     @Severity(SeverityLevel.NORMAL)
     @DisplayName("the address form refuses to advance while required fields are empty")

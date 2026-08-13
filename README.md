@@ -188,8 +188,14 @@ device-free unit tests. [ADR-005](docs/adr/0005-junit-6-and-allure.md).
 
 - [x] Quality gate, Java 21 and 25 — green, ~1 minute
 - [x] Android emulator matrix, API 31 and 34 — **green, 21/21, ~8½ minutes**
-- [x] Maestro smoke — green
-- [ ] iOS simulator — 17/21 and improving; see below
+- [x] Maestro smoke — green, ~4 minutes
+- [x] iOS simulator — **13 pass, 8 correctly skipped as Android-only, 1 quarantined**, ~40 minutes
+
+iOS went 0 → passing over six CI rounds, every diagnosis made from the failure-artifact bundle
+rather than by guesswork. The remaining quarantined test is
+[ADR-006](docs/adr/0006-flake-as-a-debt-ledger.md) doing its job on a real case: drawer navigation
+intermittently outruns the element timeout on loaded CI hardware, with a mechanism-level reason and
+an expiry date after which it fails without running.
 
 **Week 2 — not done**
 
