@@ -192,7 +192,11 @@ device-free unit tests. [ADR-005](docs/adr/0005-junit-6-and-allure.md).
 **CI — running for real**
 
 - [x] Quality gate, Java 21 and 25 — green, ~1 minute
-- [x] Android emulator matrix, API 31 and 34 — **green, 21/21, ~8½ minutes**
+- [~] Android emulator matrix — **API 31 green; API 34 red**, ~7 minutes. API 34 fails
+      `LoginScreen did not appear within 40s` opening the drawer — the same mechanism already
+      quarantined on iOS, now reproducing on slower Android hardware. Not yet quarantined: no
+      emulator here to reproduce it on, and guessing at a reason would defeat the point of
+      [ADR-006](docs/adr/0006-flake-as-a-debt-ledger.md).
 - [x] Maestro smoke — green, ~4 minutes
 - [~] iOS simulator — **14 pass, 13 skipped as Android-only, 1 failing on session creation**,
       ~40 minutes. Green earlier in the week; currently red for the reason below, with a fix in
@@ -201,21 +205,34 @@ device-free unit tests. [ADR-005](docs/adr/0005-junit-6-and-allure.md).
 iOS went 0 → passing over six CI rounds, every diagnosis made from the failure-artifact bundle
 rather than by guesswork.
 
-**The current failure is a framework bug, and a good one.** The same test died twice in a row on
-`SessionNotCreatedException` — once as *"the simulator has failed to finish booting after 128s"*,
-once as a bare `java.util.concurrent.TimeoutException` with no message at all. Different symptoms,
-one cause: **Selenium's `JdkHttpClient` defaults to a three-minute read timeout, and nobody had set
-it — so it sat below this framework's own 240 s `wdaLaunchTimeout`, which meant that ceiling could
-never be reached.** Session creation on a loaded macOS runner ran past three minutes and the client
-gave up first.
+**Chasing the red iOS lane turned up two framework bugs.** Both were live for weeks, and neither
+is the thing the error message pointed at.
 
-That is exactly the pathology [ADR-004](docs/adr/0004-explicit-waits-only.md) describes for
-implicit and explicit waits, one layer down: several timeouts govern one operation, the effective
-one is whichever is smallest, and the smallest was the one nobody had chosen. The stack is now
-deliberate and ordered — element wait 20 s, `newCommandTimeout` 120 s, WDA launch 240 s, simulator
-boot 240 s, HTTP client 420 s — with [a unit test asserting the
-ordering](core/src/test/java/dev/diegonava/mobile/core/config/FrameworkConfigTest.java) rather than
-the individual numbers, because the ordering is the invariant that was violated.
+**1. The timeout stack was out of order.** The same test died three runs running on
+`SessionNotCreatedException` — first as *"the simulator has failed to finish booting after 128s"*,
+then as a bare `java.util.concurrent.TimeoutException` with no message at all. One cause:
+**Selenium's `JdkHttpClient` defaults to a three-minute read timeout, and nobody had set it — so it
+sat below this framework's own 240 s `wdaLaunchTimeout`, which meant that ceiling could never be
+reached.** We had configured a number the stack was structurally incapable of honouring.
+
+That is [ADR-004](docs/adr/0004-explicit-waits-only.md)'s argument one layer down: several timeouts
+govern one operation, the effective one is whichever is smallest, and the smallest was the one
+nobody had chosen. The stack is now ordered — element 20 s, `newCommandTimeout` 120 s, WDA launch
+240 s, simulator boot 240 s, HTTP client 420 s — and the [unit
+test](core/src/test/java/dev/diegonava/mobile/core/config/FrameworkConfigTest.java) asserts the
+**ordering**, not the values. Asserting the numbers would not have caught this.
+
+**2. `@Flaky` never retried setup failures — the ones a device suite actually has.** With the
+timeout fixed the log read `[attempt 1 of 3] FAILED` → `[attempt 2 of 3] PASSED` → build red. The
+retry had worked and the build failed anyway. `TestExecutionExceptionHandler` covers exceptions
+from the test *body* and nothing else; a failure inside a `BeforeEachCallback` — which is where
+`DriverExtension` opens the session — goes to `LifecycleMethodExecutionExceptionHandler`, which the
+extension did not implement. So the one failure mode quarantine exists for was the one it ignored.
+
+The [self-test](core/src/test/java/dev/diegonava/mobile/core/junit/FlakyExtensionTest.java) missed
+it for the same reason the code did: every case it exercised failed in the test body. There is now
+a nested case that fails in `@BeforeEach`, and **it was verified to fail without the fix** — same
+`FAILED`-then-`PASSED`-then-red shape as CI, reproduced in eight seconds on a laptop.
 
 **Week 2 — not done**
 
@@ -360,6 +377,13 @@ anywhere, and every one of them failed on its first real run — an unset execut
 three separate ways of hanging or self-terminating the Android job. None of these were visible
 from a green local suite. It is the clearest argument in this repository for CI being part of the
 deliverable rather than a decoration on it.
+
+**The Android job wedges after the suite finishes.** On API 34 the Gradle build completed in
+6m50s and the job then hung until its 30-minute timeout cancelled it — the emulator-runner action
+not returning from teardown. The wedge is upstream and not fixed here, but the *consequence* was:
+a cancelled job is not `failure()`, so the `if: failure()` guard on the failure-artifact upload
+skipped it, and the screenshot, hierarchy and logcat were discarded for the run that most needed
+them. Both device workflows now upload on `failure() || cancelled()`.
 
 **Upgrade testing is Android-only.** The iOS simulator has no equivalent of `adb install -r`, so
 an in-place upgrade of an installed simulator build is not expressible. Recorded on the test with

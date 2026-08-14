@@ -15,6 +15,7 @@ import java.util.stream.StreamSupport;
 import org.junit.jupiter.api.extension.AfterTestExecutionCallback;
 import org.junit.jupiter.api.extension.Extension;
 import org.junit.jupiter.api.extension.ExtensionContext;
+import org.junit.jupiter.api.extension.LifecycleMethodExecutionExceptionHandler;
 import org.junit.jupiter.api.extension.TestExecutionExceptionHandler;
 import org.junit.jupiter.api.extension.TestTemplateInvocationContext;
 import org.junit.jupiter.api.extension.TestTemplateInvocationContextProvider;
@@ -155,18 +156,50 @@ public final class FlakyExtension implements TestTemplateInvocationContextProvid
         }
     }
 
+    /**
+     * Turns a failed attempt into an abort so the next one runs.
+     *
+     * <p>Implements <b>both</b> exception-handler interfaces, and the second one is not optional.
+     * {@link TestExecutionExceptionHandler} covers exceptions thrown by the test body and nothing
+     * else; a failure inside a {@code BeforeEachCallback} goes to
+     * {@link LifecycleMethodExecutionExceptionHandler} instead. Handling only the first meant this
+     * extension retried the failures a mobile suite rarely has and ignored the one it has most
+     * often — {@code DriverExtension} failing to open a session.
+     *
+     * <p>That gap was live in CI and read as something else entirely. The iOS lane reported
+     * {@code [attempt 1 of 3] FAILED} followed by {@code [attempt 2 of 3] PASSED}, and then failed
+     * the build: the retry had worked, but attempt 1's exception was never converted, so JUnit
+     * recorded a genuine failure. The suite was doing the right thing and reporting the wrong one.
+     */
     private record RetryOutcomeRecorder(RetryState state)
-            implements TestExecutionExceptionHandler, AfterTestExecutionCallback {
+            implements TestExecutionExceptionHandler,
+                    LifecycleMethodExecutionExceptionHandler,
+                    AfterTestExecutionCallback {
 
         @Override
         public void handleTestExecutionException(ExtensionContext context, Throwable throwable) throws Throwable {
+            throw abortOrFail(throwable);
+        }
+
+        /**
+         * A session that would not start is the canonical retryable failure on a device suite —
+         * the emulator was busy, the simulator was still booting, WebDriverAgent lost a race. It
+         * says nothing about the test, which is exactly what a retry is for.
+         */
+        @Override
+        public void handleBeforeEachMethodExecutionException(ExtensionContext context, Throwable throwable)
+                throws Throwable {
+            throw abortOrFail(throwable);
+        }
+
+        private Throwable abortOrFail(Throwable throwable) {
             state.recordFailure(throwable);
 
             if (state.hasRemainingAttempts()) {
-                throw new TestAbortedException(
+                return new TestAbortedException(
                         "Attempt %d failed, retrying: %s".formatted(state.attempts, throwable.getMessage()));
             }
-            throw throwable;
+            return throwable;
         }
 
         @Override

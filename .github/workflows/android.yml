@@ -145,7 +145,12 @@ jobs:
             exit $status
 
       - name: Upload failure artifacts
-        if: failure()
+        # failure() alone is not enough, and the gap is self-defeating. When the emulator wedges
+        # in teardown the job is *cancelled* by its timeout rather than failed — so this step is
+        # skipped, and the screenshot, hierarchy and logcat needed to diagnose the run are thrown
+        # away at exactly the moment they matter. API 34 did this: the suite finished in 6m50s
+        # with one real failure, then the job hung for 23 minutes and lost the evidence.
+        if: failure() || cancelled()
         uses: actions/upload-artifact@v4
         with:
           name: failure-artifacts-api${{ matrix.api-level }}
