@@ -75,7 +75,7 @@ appium driver install uiautomator2
 Then:
 
 ```bash
-# Emulator-free: format, compile, 113 unit tests, locator policy. ~10s, no secrets.
+# Emulator-free: format, compile, 118 unit tests, locator policy. ~10s, no secrets.
 ./gradlew qualityGate
 
 # Fetch both builds under test (never committed — ADR-001)
@@ -187,26 +187,23 @@ device-free unit tests. [ADR-005](docs/adr/0005-junit-6-and-allure.md).
 - [x] `@Flaky` retry + expiry-dated quarantine + JSON ledger — **self-tested, 20 unit tests green**
 - [x] Two-device parallel execution — **11/11 green, isolation verified** (see the caveat below)
 
-**21 device tests and 20 unit tests, all green** on an Android emulator.
+**21 device tests and 20 unit tests, all green** on an Android emulator — the state at the end of
+week 2. Both numbers have grown since; the current ones are under CI below.
 
 **CI — running for real**
 
-- [x] Quality gate, Java 21 and 25 — green, ~1 minute
-- [~] Android emulator matrix — **API 31 green; API 34 red**, ~7 minutes. API 34 fails
-      `LoginScreen did not appear within 40s` opening the drawer — the same mechanism already
-      quarantined on iOS, now reproducing on slower Android hardware. Not yet quarantined: no
-      emulator here to reproduce it on, and guessing at a reason would defeat the point of
-      [ADR-006](docs/adr/0006-flake-as-a-debt-ledger.md).
+- [x] Quality gate, Java 21 and 25 — green, ~1½ minutes
+- [x] Android emulator matrix, API 31 and 34 — **green, 27/27 on both**, ~8½ minutes
 - [x] Maestro smoke — green, ~4 minutes
-- [~] iOS simulator — **14 pass, 13 skipped as Android-only, 1 failing on session creation**,
-      ~40 minutes. Green earlier in the week; currently red for the reason below, with a fix in
-      flight.
+- [x] iOS simulator — **14 pass, 13 correctly skipped as Android-only, 0 failures**, 23½ minutes
 
 iOS went 0 → passing over six CI rounds, every diagnosis made from the failure-artifact bundle
 rather than by guesswork.
 
-**Chasing the red iOS lane turned up two framework bugs.** Both were live for weeks, and neither
-is the thing the error message pointed at.
+**Chasing the red iOS lane turned up two framework bugs.** Both had been live for weeks, both were
+found from CI logs alone, and neither was the thing the error message pointed at. Fixing them also
+took the iOS lane from ~43 minutes to 23½ — most of that time had been a session-creation attempt
+timing out before failing.
 
 **1. The timeout stack was out of order.** The same test died three runs running on
 `SessionNotCreatedException` — first as *"the simulator has failed to finish booting after 128s"*,
@@ -233,6 +230,16 @@ The [self-test](core/src/test/java/dev/diegonava/mobile/core/junit/FlakyExtensio
 it for the same reason the code did: every case it exercised failed in the test body. There is now
 a nested case that fails in `@BeforeEach`, and **it was verified to fail without the fix** — same
 `FAILED`-then-`PASSED`-then-red shape as CI, reproduced in eight seconds on a laptop.
+
+Both fixes are confirmed on device: the run after them was green on all four lanes, and the test
+that had been dying on session creation passed on its first attempt.
+
+**One thing deliberately left undone.** API 34 failed once with `LoginScreen did not appear within
+40s` opening the drawer, and passed on the next run without any change addressing it. It is not
+quarantined. There is no emulator here to reproduce it on, and `@Flaky` demands a mechanism — not
+a symptom — as its `reason`. Writing a plausible-sounding one to make the annotation compile is
+precisely the failure [ADR-006](docs/adr/0006-flake-as-a-debt-ledger.md) exists to prevent, so it
+is recorded here instead until someone can actually watch it happen.
 
 **Week 2 — not done**
 
@@ -300,7 +307,8 @@ Off by default — `-Dmobile.ai.locatorFallback=true` **and** a key. A test run 
 making network calls on the strength of an exported environment variable. Cloning this repo and
 running it green must never require an Anthropic account, and does not.
 
-> **What is verified, and what is not.** 49 unit tests cover credential resolution and redaction,
+> **What is verified, and what is not.** 49 of the suite's 118 unit tests cover credential
+> resolution and redaction,
 > the prompts, the hierarchy digest, the logcat tail, bundle discovery, and the locator policy
 > gate — no key, no network, wired into `qualityGate`. The three paths of `checkLocatorDebt`
 > (fails on unaccepted, passes on accepted, warns on stale) were verified by hand against a
@@ -378,9 +386,10 @@ three separate ways of hanging or self-terminating the Android job. None of thes
 from a green local suite. It is the clearest argument in this repository for CI being part of the
 deliverable rather than a decoration on it.
 
-**The Android job wedges after the suite finishes.** On API 34 the Gradle build completed in
-6m50s and the job then hung until its 30-minute timeout cancelled it — the emulator-runner action
-not returning from teardown. The wedge is upstream and not fixed here, but the *consequence* was:
+**The Android job sometimes wedges after the suite finishes.** On one API 34 run the Gradle build
+completed in 6m50s and the job then hung until its 30-minute timeout cancelled it — the
+emulator-runner action not returning from teardown. Intermittent: the next run finished cleanly in
+8m42s. The wedge is upstream and not fixed here, but the *consequence* was worth fixing:
 a cancelled job is not `failure()`, so the `if: failure()` guard on the failure-artifact upload
 skipped it, and the screenshot, hierarchy and logcat were discarded for the run that most needed
 them. Both device workflows now upload on `failure() || cancelled()`.
