@@ -51,3 +51,38 @@ jobs:
           path: core/build/reports/tests/test
           retention-days: 7
           if-no-files-found: ignore
+
+  # ADR-009 claims the AI layer can be deleted and the framework still builds and runs.
+  # That is the load-bearing claim of the whole design — it is what makes "optional" a
+  # structural fact rather than a sentence in a README — and until this job existed it was
+  # the one invariant in this repository with nothing enforcing it.
+  #
+  # -Pmobile.ai.absent=true drops the module from settings.gradle.kts exactly as deleting the
+  # include() line would, then runs the entire gate. If anything in core, screens or tests
+  # ever grows a dependency on the AI layer, this goes red and the ADR stops being a lie.
+  without-ai:
+    name: Deletable AI layer
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Confirm the :ai module really is absent
+        run: |
+          ./gradlew projects -Pmobile.ai.absent=true -q | tee projects.txt
+          if grep -q "Project ':ai'" projects.txt; then
+            echo "::error::The :ai module is still in the build; this job would prove nothing."
+            exit 1
+          fi
+
+      - name: Quality gate without the AI layer
+        run: ./gradlew qualityGate -Pmobile.ai.absent=true --stacktrace

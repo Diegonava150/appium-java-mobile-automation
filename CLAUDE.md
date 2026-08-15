@@ -64,6 +64,14 @@ from it — `core` declares the `LocatorFallback` interface and finds implementa
 `ServiceLoader`. Deleting `include("ai")` from `settings.gradle.kts` must leave a framework that
 compiles and runs. If a change would break that, it is the wrong change.
 
+Check it before you claim a change is safe:
+
+```bash
+./gradlew qualityGate -Pmobile.ai.absent=true    # quote the flag in PowerShell
+```
+
+CI runs exactly that on every push, as the "Deletable AI layer" job.
+
 It is also off by default: `-Dmobile.ai.locatorFallback=true` plus a key. A test run should not
 start making network calls on the strength of an exported environment variable.
 

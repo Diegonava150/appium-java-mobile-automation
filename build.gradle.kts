@@ -274,5 +274,10 @@ val qualityGate = tasks.register("qualityGate") {
     // resolution, the prompt, the hierarchy digest and the locator policy gate, which is
     // everything about that module except the HTTP call in the middle. Leaving them out of
     // the gate would mean the one part of the AI layer that *is* verifiable never runs in CI.
-    dependsOn(":ai:test")
+    //
+    // Conditional so the gate still runs under -Pmobile.ai.absent=true, which is the run that
+    // proves the module is genuinely removable. See settings.gradle.kts.
+    if (findProject(":ai") != null) {
+        dependsOn(":ai:test")
+    }
 }

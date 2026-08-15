@@ -291,9 +291,11 @@ as the flake ledger, for the same reason: a check that is red forever gets switc
       suggest `//android.widget.Button[3]` — the locator most likely to match and the worst thing
       to admit into a suite. `checkNoXPath` guards the source tree; this guards runtime, which is
       the one place the static check can never look.
-- [x] **Optional by construction, not by claim** — `core` declares the interface and resolves it
-      through `ServiceLoader`; `:ai` is on the test *runtime* classpath only. Delete
-      `include("ai")` and the framework still compiles and runs.
+- [x] **Optional by construction, and a CI job proves it** — `core` declares the interface and
+      resolves it through `ServiceLoader`; `:ai` is on the test *runtime* classpath only. A
+      dedicated job drops the module from the build (`-Pmobile.ai.absent=true`), asserts it is
+      genuinely gone, then runs the **whole quality gate** without it. Grow a dependency on the
+      AI layer anywhere in `core`, `screens` or `tests` and that job goes red.
 - [x] **`appium-mcp` wired** (`.mcp.json`) plus a `CLAUDE.md` of the invariants the build enforces
 - [x] **Failure triage** over the screenshot + hierarchy + logcat bundle — `./gradlew
       triageFailures` writes a `triage.md` beside each failure. Offline on purpose, so it works on

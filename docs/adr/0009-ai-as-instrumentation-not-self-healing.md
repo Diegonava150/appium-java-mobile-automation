@@ -42,12 +42,21 @@ This is the same shape as the flake ledger (ADR-006) and the accessibility basel
 for the same reason: a check that is red forever gets switched off, so record the existing
 debt, gate on regressions, and make the debt visible, attributed and dated.
 
-**2. Optional by construction.** `core` declares a `LocatorFallback` interface and resolves
-implementations through `ServiceLoader`. The implementation lives in `:ai`, which is on the
-test runtime classpath only — no test can import an AI type, so nothing can come to depend on
-the layer existing. Delete `include("ai")` from `settings.gradle.kts` and the framework
-compiles, runs, and simply finds no fallback. "The AI layer is optional" is a structural fact
-that can be checked in thirty seconds, not a sentence in a README.
+**2. Optional by construction, and checked on every push.** `core` declares a `LocatorFallback`
+interface and resolves implementations through `ServiceLoader`. The implementation lives in
+`:ai`, which is on the test runtime classpath only — no test can import an AI type, so nothing
+can come to depend on the layer existing. Delete `include("ai")` from `settings.gradle.kts` and
+the framework compiles, runs, and simply finds no fallback.
+
+That was the claim, and for a while it was only a claim. It is now a CI job: `-Pmobile.ai.absent=true`
+drops the module from the build exactly as deleting the line would, and the **entire quality gate
+runs that way on every push** — after first asserting the module is genuinely gone, so the job
+cannot pass vacuously. If anything in `core`, `screens` or `tests` ever grows a dependency on the
+AI layer, that job goes red and this ADR stops being true out loud rather than quietly.
+
+Making it enforceable mattered more than it might look. Every other invariant here has a task
+behind it — `checkNoXPath`, `QuarantinePolicy`, `checkLocatorDebt`, `allureWiringCheck` — and this
+was the one load-bearing claim resting on nothing but prose.
 
 **3. Off by default.** It needs `-Dmobile.ai.locatorFallback=true` **and** a key. Defaulting to
 on with a key present would mean that anyone who happens to have `ANTHROPIC_API_KEY` exported

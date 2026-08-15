@@ -17,7 +17,12 @@ dependencies {
     // On the runtime classpath rather than the compile one on purpose: no test can import an
     // AI type, so nothing here can come to depend on the layer being there. Delete the line and
     // the suite still compiles and still runs. See ADR-009.
-    testRuntimeOnly(project(":ai"))
+    //
+    // Guarded so `-Pmobile.ai.absent=true` genuinely removes the module rather than failing to
+    // resolve it — which would prove nothing except that this line exists.
+    if (findProject(":ai") != null) {
+        testRuntimeOnly(project(":ai"))
+    }
 }
 
 /**
