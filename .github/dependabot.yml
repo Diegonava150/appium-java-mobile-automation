@@ -41,8 +41,11 @@ updates:
         patterns: ["com.anthropic:*"]
 
   # Where the deprecation warnings come from, and where the openjdk:8 class of failure lives.
-  # peaceiris/actions-gh-pages in report.yml is third-party and is the one to watch: a Maven
-  # update would never have surfaced it.
+  #
+  # Every action here is now first-party. report.yml used to pull peaceiris/actions-gh-pages to
+  # push the report to a branch, and that was the one worth watching — a Maven update would never
+  # have surfaced a problem with it. Publishing through the official Pages actions removed it
+  # along with the branch, so the watch list is shorter rather than better monitored.
   - package-ecosystem: github-actions
     directory: /
     schedule:
