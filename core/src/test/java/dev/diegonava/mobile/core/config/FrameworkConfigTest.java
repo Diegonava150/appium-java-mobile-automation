@@ -72,6 +72,32 @@ class FrameworkConfigTest {
     }
 
     @Test
+    @DisplayName("the idle wait is off by default, and can be turned back on")
+    void idleWaitIsOffByDefault() {
+        // Not a style preference. XCUITest waits for the app to report idle before every
+        // interaction, and React Native never reports idle, so the wait expires and the
+        // interaction proceeds anyway — bought nothing, paid per interaction. Measured across the
+        // same fourteen parity tests: 37.6 min on iOS against 4.0 min on Android, with the
+        // overhead scaling as the test does rather than as a fixed cost per session.
+        //
+        // Zero here is therefore the deliberate value, and a non-zero default arriving by
+        // accident would quietly restore the 6.2x. Hence a test on the default itself.
+        assertThat(FrameworkConfig.get().iosWaitForIdleTimeout())
+                .as("a non-zero idle wait costs roughly six times the runtime and buys nothing "
+                        + "on a React Native app")
+                .isZero();
+
+        System.setProperty("mobile.ios.waitForIdleTimeout.seconds", "5");
+        try {
+            assertThat(FrameworkConfig.get().iosWaitForIdleTimeout().toSeconds())
+                    .as("a test that genuinely races the UI must be able to ask for the wait back")
+                    .isEqualTo(5);
+        } finally {
+            System.clearProperty("mobile.ios.waitForIdleTimeout.seconds");
+        }
+    }
+
+    @Test
     @DisplayName("numeric and boolean values are coerced from their string form")
     void coercesTypes() {
         System.setProperty("mobile.timeout.element.seconds", "45");

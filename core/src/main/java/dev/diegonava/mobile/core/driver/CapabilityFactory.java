@@ -66,6 +66,16 @@ public final class CapabilityFactory {
                 // Reuse the existing WDA rather than reinstalling it per session.
                 .setUsePrebuiltWda(false)
                 .setUseNewWDA(false)
+                // Before every interaction XCUITest waits for the app to report idle, and a
+                // React Native app never does — the bridge and the animation driver keep it
+                // busy — so each tap and each lookup waits out the timeout and then proceeds
+                // regardless. Measured against the same tests on Android, that is a 6.2x
+                // per-interaction multiplier and the bulk of this lane's runtime. See
+                // FrameworkConfig#iosWaitForIdleTimeout.
+                .setWaitForIdleTimeout(config.iosWaitForIdleTimeout())
+                // Animations are time spent rendering pixels nothing asserts on, and an element
+                // caught mid-transition is the usual reason a tap lands on nothing.
+                .setReduceMotion(config.iosReduceMotion())
                 // iOS offers to save the password after a sign-in, and that dialog is the
                 // system's, not the app's. It floats above the catalog and makes every product
                 // row report as not visible — a failure that reads, unhelpfully, as "the screen
