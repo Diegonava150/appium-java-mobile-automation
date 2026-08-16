@@ -1,0 +1,59 @@
+# Nothing was bumping anything here. Every action in .github/workflows was pinned at v4 and
+# every job printed a Node 20 deprecation notice per step, which is the visible half of the
+# problem; the invisible half is that the same drift eventually stops a workflow running at all.
+#
+# That is not hypothetical. The sibling REST Assured repository lost its report generation to an
+# action built FROM openjdk:8-jre-alpine after Docker Hub removed the image, and separately would
+# not compile because Lombok 1.18.28 predates JDK 21. Neither was caught by any test, because a
+# green suite says nothing about whether the things around it still resolve.
+#
+# The action versions here are deliberately not hand-bumped in the same change that added this
+# file. Letting the bot make its own first pass is both a smaller diff and a check that the bot
+# is configured correctly.
+
+version: 2
+
+updates:
+  - package-ecosystem: gradle
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels: [dependencies, java]
+    commit-message:
+      prefix: "deps"
+    groups:
+      # Artifacts sharing a version line move together, or the build breaks on the intermediate
+      # state. Appium's client and its Selenium transitive are the pair most likely to bite.
+      appium:
+        patterns: ["io.appium:*"]
+      selenium:
+        patterns: ["org.seleniumhq.selenium:*"]
+      junit:
+        patterns: ["org.junit*:*"]
+      logging:
+        patterns: ["org.apache.logging.log4j:*", "org.slf4j:*"]
+      # ADR-009 requires this module to stay deletable, so its dependencies are grouped rather
+      # than arriving one at a time — a partial bump here is the shape of change most likely to
+      # break the "Deletable AI layer" job without anyone connecting the two.
+      anthropic:
+        patterns: ["com.anthropic:*"]
+
+  # Where the deprecation warnings come from, and where the openjdk:8 class of failure lives.
+  # peaceiris/actions-gh-pages in report.yml is third-party and is the one to watch: a Maven
+  # update would never have surfaced it.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    labels: [dependencies, ci]
+    commit-message:
+      prefix: "ci"
+
+# No docker ecosystem block, deliberately. There is no Dockerfile and no compose file in this
+# repository, and Dependabot's docker updater parses only those two. The gitleaks image tag in
+# quality-gate.yml is a string inside a run step, which it cannot read either. Pointing the block
+# at a directory it cannot use fails on every run, and a config that errors constantly is worse
+# than an acknowledged gap — so that pin is bumped by hand.
