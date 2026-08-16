@@ -86,3 +86,62 @@ jobs:
 
       - name: Quality gate without the AI layer
         run: ./gradlew qualityGate -Pmobile.ai.absent=true --stacktrace
+
+  # This repository handles an Anthropic API key. It is never committed and the AI layer is off
+  # by default, but "we were careful" is the assurance every leaked-credential postmortem opens
+  # with, and a repository nobody scanned looks exactly like one with nothing in it.
+  #
+  # Over the full history rather than the working tree. A key committed once and deleted in the
+  # next commit is still in the pack file, still reachable by anyone who clones, and still has to
+  # be rotated — removing the line does not unpublish it. A working-tree scan calls that
+  # repository clean, which is the more dangerous of the two answers.
+  #
+  # Pinned, not :latest. Dependabot cannot see this tag, because it is a string inside a run step
+  # rather than a `uses:` — so bumping it is a deliberate act. ADR-009's whole argument is that
+  # convenience which hides a decision is the problem.
+  secrets-scan:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GITLEAKS_IMAGE: ghcr.io/gitleaks/gitleaks:v8.30.1
+
+    steps:
+      # v7 while the jobs above are still on v4: Dependabot was added in the same change and
+      # will bring the rest forward on its next run. Writing a new job against v4 would have
+      # meant knowingly adding another Node 20 deprecation warning to a build that already
+      # prints one per step.
+      - uses: actions/checkout@v7
+        with:
+          # Full history. The default shallow clone fetches one commit, and scanning one commit
+          # while printing "no leaks found" is precisely the false assurance this job exists to
+          # avoid.
+          fetch-depth: 0
+
+      # The same move as the "Deletable AI layer" job above, applied to a scanner: prove the
+      # check can fail before believing that it passed. gitleaks pointed at a path that does not
+      # exist exits 0, which is indistinguishable from a clean result — and that mount path is a
+      # real thing that breaks.
+      #
+      # The key is generated here, random, valid nowhere, and written outside the workspace so
+      # it can reach neither the scan below nor a commit.
+      - name: Prove the scanner can fail
+        run: |
+          canary="$RUNNER_TEMP/canary"
+          mkdir -p "$canary"
+          printf 'ANTHROPIC_API_KEY=sk-ant-api03-%sAA\n' \
+            "$(head -c 300 /dev/urandom | base64 | tr -dc 'A-Za-z0-9_-' | head -c 93)" \
+            > "$canary/planted.env"
+
+          if docker run --rm -v "$canary:/scan" "$GITLEAKS_IMAGE" \
+               detect --source=/scan --no-git --redact --no-banner; then
+            echo "::error::gitleaks reported clean on a directory containing a planted key."
+            echo "::error::The scan below would report clean too, whatever this repository contains."
+            exit 1
+          fi
+          echo "Planted key was caught, so a clean result below means something."
+
+      - name: Scan the full history
+        run: |
+          docker run --rm -v "$PWD:/repo" "$GITLEAKS_IMAGE" \
+            detect --source=/repo --redact --verbose --no-banner
