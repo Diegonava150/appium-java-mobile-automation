@@ -32,10 +32,10 @@ jobs:
     timeout-minutes: 60
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up JDK 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 21
@@ -44,7 +44,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 22
 
@@ -60,7 +60,7 @@ jobs:
       # WebDriverAgent is an Xcode project, and without a shared derived-data directory it is
       # rebuilt for every single session. Caching it is the main lever on this job's runtime.
       - name: Cache WebDriverAgent derived data
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/wda-derived-data
           key: wda-derived-data-${{ runner.os }}-v1
@@ -91,7 +91,7 @@ jobs:
         # See the note in android.yml: a job cancelled by its timeout is not failure(), and
         # skipping the upload there discards the evidence for the runs hardest to diagnose.
         if: failure() || cancelled()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ios-failure-artifacts
           path: |
@@ -102,7 +102,7 @@ jobs:
 
       - name: Upload Allure results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: allure-results-ios
           path: tests/build/allure-results

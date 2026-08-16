@@ -32,7 +32,7 @@ jobs:
         api-level: [31, 34]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Enable KVM
         run: |
@@ -42,7 +42,7 @@ jobs:
           sudo udevadm trigger --name-match=kvm
 
       - name: Set up JDK 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 21
@@ -51,7 +51,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 22
 
@@ -68,7 +68,7 @@ jobs:
       # boot snapshot; on a hit the emulator resumes from it. This is the difference
       # between a ~6 minute job and a ~20 minute one.
       - name: Cache the AVD snapshot
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         id: avd-cache
         with:
           path: |
@@ -151,7 +151,7 @@ jobs:
         # away at exactly the moment they matter. API 34 did this: the suite finished in 6m50s
         # with one real failure, then the job hung for 23 minutes and lost the evidence.
         if: failure() || cancelled()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: failure-artifacts-api${{ matrix.api-level }}
           # Screenshot, native view hierarchy and logcat for every failed test —
@@ -164,7 +164,7 @@ jobs:
 
       - name: Upload Allure results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: allure-results-api${{ matrix.api-level }}
           path: tests/build/allure-results
@@ -177,7 +177,7 @@ jobs:
       # that profile. See tests/src/test/resources/visual-baselines/README.md.
       - name: Upload any recorded visual baselines
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: visual-baselines-api${{ matrix.api-level }}
           path: tests/src/test/resources/visual-baselines
@@ -188,7 +188,7 @@ jobs:
       # there, and a stray JSON of a different shape is asking for trouble.
       - name: Upload the flake ledger
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: flake-ledger-api${{ matrix.api-level }}
           path: tests/build/flake-report.json
