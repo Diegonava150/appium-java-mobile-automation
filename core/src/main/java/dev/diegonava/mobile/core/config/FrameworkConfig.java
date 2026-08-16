@@ -108,10 +108,16 @@ public final class FrameworkConfig {
     /**
      * Where XCUITest keeps WebDriverAgent's build output.
      *
-     * <p>Without this, WDA is rebuilt from scratch for every session. Across a 21-test suite that
-     * is the single largest cost on iOS — it is most of why the simulator lane takes forty minutes
-     * against Android's eight. Pointing every session at one derived-data directory means WDA is
-     * compiled once and reused, and the directory is cacheable between CI runs.
+     * <p>Without this, WDA is rebuilt from scratch for every session. Pointing every session at
+     * one derived-data directory means it is compiled once and reused, and the directory is
+     * cacheable between CI runs.
+     *
+     * <p>This note used to claim the rebuild was "most of why the simulator lane takes forty
+     * minutes against Android's eight". That was wrong, and wrong in the way worth recording: the
+     * cache was in place, working, and the lane still took forty minutes. It was measured
+     * afterwards rather than reasoned about, and the cost turned out to be per-interaction rather
+     * than per-session — see {@link #iosWaitForIdleTimeout()}. Worth a real saving, just not that
+     * one.
      */
     public Optional<Path> iosDerivedDataPath() {
         return optional("mobile.ios.derivedDataPath").map(Path::of).map(Path::toAbsolutePath);
@@ -129,6 +135,44 @@ public final class FrameworkConfig {
      */
     public boolean iosAutoDismissAlerts() {
         return bool("mobile.ios.autoDismissAlerts", true);
+    }
+
+    /**
+     * How long XCUITest waits for the app to go idle before each interaction. Zero by default,
+     * which disables the wait.
+     *
+     * <p>This is the single biggest cost on the iOS lane, and it is not what the derived-data
+     * note above claims. That cache is in place and the lane still took forty minutes, so the
+     * suite was measured against Android instead — the same fourteen parity tests, 37.6 min on
+     * iOS against 4.0 min on Android.
+     *
+     * <p>The shape of that gap is what identifies the cause. Session setup would add a fixed cost
+     * per test, so short tests would show a large ratio and long ones a small one. Instead the
+     * overhead scales with the test: {@code iOS ≈ 25s + 6.2 × Android} across the suite. A
+     * constant of 25 s is the session; the multiplier of 6.2 is paid per interaction, and that is
+     * where the thirty-odd minutes are.
+     *
+     * <p>Before each interaction XCUITest waits for the application to report idle. React Native
+     * never does — the bridge, the animation driver and any timer keep it busy — so every tap and
+     * every lookup waits out the full timeout and then proceeds anyway. The wait buys nothing
+     * here and costs it repeatedly, which is exactly the 6.2×.
+     *
+     * <p>Raise it if a test races the UI. That would be a real signal rather than this one, and
+     * the honest fix is usually an explicit wait on the thing being raced.
+     */
+    public Duration iosWaitForIdleTimeout() {
+        return Duration.ofSeconds(integer("mobile.ios.waitForIdleTimeout.seconds", 0));
+    }
+
+    /**
+     * Whether to ask the simulator to reduce motion. On by default.
+     *
+     * <p>Transition animations are time the suite spends waiting for pixels it never asserts on,
+     * and an element mid-animation is the classic source of a tap landing on nothing. Turning
+     * them off is both faster and steadier.
+     */
+    public boolean iosReduceMotion() {
+        return bool("mobile.ios.reduceMotion", true);
     }
 
     /**
