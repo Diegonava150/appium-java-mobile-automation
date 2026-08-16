@@ -91,7 +91,7 @@ jobs:
         # See the note in android.yml: a job cancelled by its timeout is not failure(), and
         # skipping the upload there discards the evidence for the runs hardest to diagnose.
         if: failure() || cancelled()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ios-failure-artifacts
           path: |
@@ -102,7 +102,7 @@ jobs:
 
       - name: Upload Allure results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: allure-results-ios
           path: tests/build/allure-results
