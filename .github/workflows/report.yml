@@ -34,7 +34,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Download every Allure result from the triggering run
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: allure-results-*
           path: downloaded
