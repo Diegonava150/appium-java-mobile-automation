@@ -9,6 +9,13 @@ name: Report
 #
 # Runs after the Android workflow rather than inside it: there are two matrix legs producing
 # results, and they have to be merged before a report means anything.
+#
+# Published through the official Pages actions, not by committing to a gh-pages branch. The two
+# sibling repositories already work this way and this one was the odd one out — it carried a
+# branch of generated HTML, and a third-party action to push to it. That action is the same class
+# of dependency that broke the REST Assured repository's reporting when the base image of the
+# Allure action it used was deleted from Docker Hub. Fewer things here can rot independently of
+# the build.
 
 on:
   workflow_run:
@@ -16,8 +23,12 @@ on:
     types: [completed]
   workflow_dispatch:
 
+# contents: read, not write. Nothing is committed any more; deployment goes through the Pages
+# service, which is what pages/id-token authorise.
 permissions:
-  contents: write
+  contents: read
+  pages: write
+  id-token: write
   actions: read
 
 concurrency:
@@ -30,11 +41,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Download every Allure result from the triggering run
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: allure-results-*
           path: downloaded
@@ -53,40 +68,51 @@ jobs:
             echo "No Allure results in this run — nothing to publish."
           fi
 
-      # The previous report's history directory is what turns a series of isolated reports into a
-      # trend. Without this step every report claims to be the first one ever run.
+      # The previous report's history is what turns a series of isolated reports into a trend.
+      # Without it every report claims to be the first one ever run.
+      #
+      # Read over HTTP from the published site, which is a direct translation of what the old
+      # gh-pages checkout did: the last published report *is* the previous state. Deliberately not
+      # actions/cache — GitHub evicts a cache after seven days without a read, so on a repository
+      # that goes quiet for a week the trend would reset itself and nothing would say so. The
+      # published report cannot expire out from under us.
       - name: Restore history from the published report
         if: steps.check.outputs.found == 'true'
-        uses: actions/checkout@v4
-        with:
-          ref: gh-pages
-          path: gh-pages
-        continue-on-error: true
-
-      - name: Carry history forward
-        if: steps.check.outputs.found == 'true'
         run: |
-          if [ -d gh-pages/history ]; then
-            cp -r gh-pages/history downloaded/history
-            echo "Carried forward $(ls gh-pages/history | wc -l) history file(s)."
+          site="https://${GITHUB_REPOSITORY%%/*}.github.io/${GITHUB_REPOSITORY#*/}"
+          mkdir -p downloaded/history
+          restored=0
+          for file in history.json history-trend.json categories-trend.json \
+                      duration-trend.json retry-trend.json; do
+            if curl -fsSL --max-time 30 -o "downloaded/history/$file" "$site/history/$file"; then
+              restored=$((restored + 1))
+            else
+              rm -f "downloaded/history/$file"
+            fi
+          done
+          if [ "$restored" -eq 0 ]; then
+            echo "No previous history at $site — this will be the first report in the series."
           else
-            echo "No previous history — this will be the first report in the series."
+            echo "Carried forward $restored history file(s) from $site."
           fi
 
       - name: Set up JDK 21
         if: steps.check.outputs.found == 'true'
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 21
 
-      - name: Generate the report
+      # executor.json goes into the *results* directory, before generation.
+      #
+      # It used to be written into allure-report/ afterwards, which did nothing at all: Allure
+      # reads executor.json while generating and renders it into widgets/executors.json. That
+      # widget has been an empty array on every published report since the step was added — the
+      # run has never actually been named, and the report looked like it was.
+      - name: Name the run in the report
         if: steps.check.outputs.found == 'true'
         run: |
-          npm install -g allure-commandline
-          allure generate downloaded --clean -o allure-report
-          # Name the run in the report rather than leaving it as an opaque number.
-          cat > allure-report/executor.json <<JSON
+          cat > downloaded/executor.json <<JSON
           {
             "name": "GitHub Actions",
             "type": "github",
@@ -96,14 +122,33 @@ jobs:
           }
           JSON
 
-      - name: Publish to GitHub Pages
+      - name: Generate the report
         if: steps.check.outputs.found == 'true'
-        uses: peaceiris/actions-gh-pages@v4
+        run: |
+          npm install -g allure-commandline
+          allure generate downloaded --clean -o allure-report
+
+          # Prove the executor was actually picked up. The previous version of this step looked
+          # exactly like it worked and produced an empty widget for twenty consecutive reports,
+          # because nothing ever read the file back. Checking is three lines.
+          widget=allure-report/widgets/executors.json
+          if [ ! -s "$widget" ] || ! grep -q 'buildName' "$widget"; then
+            echo "::error::$widget has no executor — executor.json was not picked up and the run is unnamed."
+            cat "$widget" 2>/dev/null || echo "(the widget was not written at all)"
+            exit 1
+          fi
+          echo "Executor recorded: $(cat "$widget")"
+
+      - uses: actions/configure-pages@v6
+        if: steps.check.outputs.found == 'true'
+
+      - name: Upload the report
+        if: steps.check.outputs.found == 'true'
+        uses: actions/upload-pages-artifact@v5
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: allure-report
-          publish_branch: gh-pages
-          keep_files: false
-          user_name: github-actions[bot]
-          user_email: github-actions[bot]@users.noreply.github.com
-          commit_message: "report: Android run ${{ github.event.workflow_run.run_number || github.run_number }}"
+          path: allure-report
+
+      - name: Deploy to Pages
+        id: deploy
+        if: steps.check.outputs.found == 'true'
+        uses: actions/deploy-pages@v5
