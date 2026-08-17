@@ -107,10 +107,6 @@ jobs:
       GITLEAKS_IMAGE: ghcr.io/gitleaks/gitleaks:v8.30.1
 
     steps:
-      # v7 while the jobs above are still on v4: Dependabot was added in the same change and
-      # will bring the rest forward on its next run. Writing a new job against v4 would have
-      # meant knowingly adding another Node 20 deprecation warning to a build that already
-      # prints one per step.
       - uses: actions/checkout@v7
         with:
           # Full history. The default shallow clone fetches one commit, and scanning one commit
