@@ -2,6 +2,7 @@ package dev.diegonava.mobile.core.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.time.Duration;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -54,6 +55,40 @@ class FrameworkConfigTest {
         assertThat(config.elementTimeout())
                 .as("an element wait is the shortest thing in the stack, by a wide margin")
                 .isLessThan(config.commandTimeout());
+    }
+
+    /**
+     * The observed cost of the first iOS session on a GitHub macOS runner, from the Appium log of
+     * the run that failed on it: {@code POST /session 200 432597 ms}.
+     *
+     * <p>A constant rather than a comment because the assertion below is only meaningful next to
+     * the number it came from.
+     */
+    private static final Duration MEASURED_COLD_START = Duration.ofSeconds(433);
+
+    @Test
+    @DisplayName("the client outlasts a measured cold start, not just the arithmetic of the ladder")
+    void sessionTimeoutCoversAMeasuredColdStart() {
+        // The ladder above is derived: boot ceiling plus command timeout, 240 + 120, rounded to
+        // 420. It described only part of what the first session does — simulator UI launch, then
+        // installing the app, then building and launching WebDriverAgent. The whole thing measured
+        // 432.6 s, the client gave up at 420 s, and Appium returned 200 to nobody twelve seconds
+        // later. The test saw SessionNotCreatedException wrapping a null-message
+        // TimeoutException: the same unhelpful shape the 420 s existed to prevent.
+        //
+        // Deriving a bound from other bounds is what went wrong, so this asserts against the
+        // measurement instead. Anyone tightening the timeout has to argue with a real number.
+        assertThat(FrameworkConfig.get().sessionTimeout())
+                .as(
+                        "a cold start was measured at %s; a ceiling below it fails intermittently and "
+                                + "reports nothing useful when it does",
+                        MEASURED_COLD_START)
+                .isGreaterThan(MEASURED_COLD_START);
+
+        assertThat(FrameworkConfig.get().sessionTimeout())
+                .as("and with enough headroom that a runner slower than the one measured still "
+                        + "fits — 3%% of margin is what made this intermittent rather than broken")
+                .isGreaterThan(MEASURED_COLD_START.plus(Duration.ofSeconds(120)));
     }
 
     @Test
