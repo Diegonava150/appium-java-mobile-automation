@@ -74,6 +74,44 @@ jobs:
           xcrun simctl bootstatus "$UDID" -b
           echo "udid=$UDID" >> "$GITHUB_OUTPUT"
 
+      # The first Appium session on a cold machine took 432 s, against what was then a 420 s
+      # client timeout — the lane's intermittent SessionNotCreatedException. The timeout is now
+      # 600 s, so it no longer fails, but the cost was still hidden: it landed inside whichever
+      # test happened to run first, which reported 451 s and looked like the slowest test in the
+      # suite. It is not; it is the only one that pays for the machine.
+      #
+      # Two of the three big pieces can be done here, with tooling the job already uses:
+      #
+      #   Simulator UI launch  ~39 s   Appium runs `open -Fn .../Simulator.app` itself. `simctl
+      #                                boot` above starts the runtime but not the UI.
+      #   Installing the app   ~70 s   "App 'com.saucelabs.mydemoapp.rn' is not installed yet"
+      #
+      # Deliberately simctl rather than a throwaway Appium session. A session needs capabilities,
+      # and writing those into YAML would duplicate CapabilityFactory — two copies of one thing,
+      # which is the drift this repository has already been bitten by twice.
+      #
+      # The third piece, building and launching WebDriverAgent, still happens in the first
+      # session. It needs a session to happen inside.
+      - name: Warm up the simulator
+        run: |
+          open -a Simulator --args -CurrentDeviceUDID "${{ steps.sim.outputs.udid }}"
+          xcrun simctl bootstatus "${{ steps.sim.outputs.udid }}" -b
+
+          app="$(pwd)/build/apps/ios/MyRNDemoApp.app"
+          if [ ! -d "$app" ]; then
+            echo "::error::No .app at $app — unpackIosApp did not produce what this step expects."
+            exit 1
+          fi
+          xcrun simctl install "${{ steps.sim.outputs.udid }}" "$app"
+
+          # Prove it, rather than assuming: an install that silently no-ops would move the 70 s
+          # straight back into the first test and nothing here would say so.
+          if ! xcrun simctl listapps "${{ steps.sim.outputs.udid }}" | grep -q 'com.saucelabs.mydemoapp.rn'; then
+            echo "::error::The app is not installed after simctl install; the warm-up did nothing."
+            exit 1
+          fi
+          echo "Simulator UI is up and com.saucelabs.mydemoapp.rn is installed."
+
       - name: Start Appium
         run: |
           appium --port 4723 --log-level info --log appium.log &
@@ -94,11 +132,41 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: ios-failure-artifacts
-          path: |
-            tests/build/test-artifacts
-            appium.log
+          path: tests/build/test-artifacts
           retention-days: 14
           if-no-files-found: ignore
+
+      # Always, not just on failure. This log is the only place the per-session cost is
+      # recorded — `POST /session 200 432597 ms` is what identified the cold start, and it was
+      # only available because that particular run happened to fail. Every green run's timing
+      # was being thrown away, which is precisely the data needed to tell a real improvement
+      # from a fast runner.
+      - name: Upload the Appium log
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ios-appium-log
+          path: appium.log
+          retention-days: 14
+          if-no-files-found: ignore
+
+      # The session timings, extracted into the job summary so the next person does not have to
+      # download an artifact to see where the time went.
+      - name: Session timings
+        if: always()
+        run: |
+          if [ ! -f appium.log ]; then echo "No appium.log." >> "$GITHUB_STEP_SUMMARY"; exit 0; fi
+          {
+            echo "### Session creation"
+            echo ""
+            grep -oE '<-- POST /session 200 [0-9]+ ms' appium.log \
+              | grep -oE '[0-9]+ ms' | awk '{ s+=$1; n+=1; if (n==1) first=$1 }
+                  END { if (n==0) { print "No sessions recorded." ; exit }
+                        printf "- sessions: **%d**\n", n
+                        printf "- first (cold start): **%.1f s**\n", first/1000
+                        if (n>1) printf "- the rest: **%.1f s** total, %.1f s each\n", (s-first)/1000, (s-first)/(n-1)/1000
+                        printf "- all session setup: **%.1f min**\n", s/60000 }'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload Allure results
         if: always()
