@@ -213,12 +213,38 @@ public final class FrameworkConfig {
      *   newCommandTimeout    120 s   server-side idle-session reaper
      *   wdaLaunchTimeout     240 s   WebDriverAgent coming up
      *   simulatorStartup     240 s   a simulator booting
-     *   session (this)       420 s   the client's patience — must exceed the sum of a boot
-     *                                followed by a WDA launch, not merely the larger of them
+     *   session (this)       600 s   the client's patience — must exceed a whole cold start, not
+     *                                merely the largest single step inside one
      * </pre>
+     *
+     * <p>It was 420 s, and 420 s was derived rather than measured: the boot ceiling plus the
+     * command timeout, 240 + 120, rounded up. That sum turned out to describe only part of what
+     * the first session does. From the Appium log of a failing run:
+     *
+     * <pre>
+     *   POST /session 200   432597 ms   &lt;- the first session
+     *   POST /session 200    60631 ms
+     *   POST /session 200    74957 ms
+     *   POST /session 200   ~30-45 s    &lt;- every one after that
+     * </pre>
+     *
+     * <p>432 s against a 420 s ceiling. The client gave up twelve seconds before Appium finished,
+     * Appium then returned {@code 200} to nobody, and the test saw
+     * {@code SessionNotCreatedException} wrapping a {@code TimeoutException} with a null message —
+     * the same shape of unhelpful error the 420 s was introduced to fix, one layer further out.
+     * A 3% margin is also why it failed intermittently rather than every time.
+     *
+     * <p>A cold start is more than a boot. Simulator UI launch, roughly 39 s; installing the app,
+     * roughly 70 s; then building and launching WebDriverAgent, polling {@code ECONNREFUSED} on
+     * 8100 until it answers. Only the boot was in the arithmetic.
+     *
+     * <p>600 s is the measured 432 s with about 40% of headroom, on the reasoning that a shared
+     * macOS runner is exactly the machine that will one day be slower than the one measured. The
+     * cost of being generous is that a genuinely wedged session now takes ten minutes to fail
+     * rather than seven, against a sixty minute job budget.
      */
     public Duration sessionTimeout() {
-        return Duration.ofSeconds(integer("mobile.timeout.session.seconds", 420));
+        return Duration.ofSeconds(integer("mobile.timeout.session.seconds", 600));
     }
 
     // --------------------------------------------------------------------- app
