@@ -111,15 +111,17 @@ class FrameworkConfigTest {
     void idleWaitIsOffByDefault() {
         // Not a style preference. XCUITest waits for the app to report idle before every
         // interaction, and React Native never reports idle, so the wait expires and the
-        // interaction proceeds anyway — bought nothing, paid per interaction. Measured across the
-        // same fourteen parity tests: 37.6 min on iOS against 4.0 min on Android, with the
-        // overhead scaling as the test does rather than as a fixed cost per session.
+        // interaction proceeds anyway — bought nothing, charged per interaction.
         //
-        // Zero here is therefore the deliberate value, and a non-zero default arriving by
-        // accident would quietly restore the 6.2x. Hence a test on the default itself.
+        // Zero is therefore the deliberate value and a non-zero default arriving by accident
+        // would be a silent regression, which is what this asserts.
+        //
+        // Note what is *not* claimed. The saving was first reported at 30% from one run either
+        // side; eight later runs span 26.4 to 42.6 min with nothing in the code to explain it, so
+        // that figure is inside the runner's own noise. The reasoning stands, the number does not,
+        // and this test guards the setting rather than a speedup.
         assertThat(FrameworkConfig.get().iosWaitForIdleTimeout())
-                .as("a non-zero idle wait costs roughly six times the runtime and buys nothing "
-                        + "on a React Native app")
+                .as("a wait the app can never satisfy is not worth performing before every " + "interaction")
                 .isZero();
 
         System.setProperty("mobile.ios.waitForIdleTimeout.seconds", "5");

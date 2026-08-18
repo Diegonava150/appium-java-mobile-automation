@@ -141,21 +141,29 @@ public final class FrameworkConfig {
      * How long XCUITest waits for the app to go idle before each interaction. Zero by default,
      * which disables the wait.
      *
-     * <p>This is the single biggest cost on the iOS lane, and it is not what the derived-data
-     * note above claims. That cache is in place and the lane still took forty minutes, so the
-     * suite was measured against Android instead — the same fourteen parity tests, 37.6 min on
-     * iOS against 4.0 min on Android.
+     * <p>The iOS lane is far slower than the Android one running the same fourteen parity tests —
+     * 37.6 min against 4.0 min when first measured. That gap is real and much too large to be
+     * runner noise.
      *
-     * <p>The shape of that gap is what identifies the cause. Session setup would add a fixed cost
-     * per test, so short tests would show a large ratio and long ones a small one. Instead the
-     * overhead scales with the test: {@code iOS ≈ 25s + 6.2 × Android} across the suite. A
-     * constant of 25 s is the session; the multiplier of 6.2 is paid per interaction, and that is
-     * where the thirty-odd minutes are.
+     * <p>Its shape points at a per-interaction cost rather than a per-session one. Session setup
+     * would add a fixed amount per test, so short tests would show a large ratio and long ones a
+     * small one. Instead the overhead scaled with the test: {@code iOS ≈ 25s + 6.2 × Android}.
      *
-     * <p>Before each interaction XCUITest waits for the application to report idle. React Native
-     * never does — the bridge, the animation driver and any timer keep it busy — so every tap and
-     * every lookup waits out the full timeout and then proceeds anyway. The wait buys nothing
-     * here and costs it repeatedly, which is exactly the 6.2×.
+     * <p>Which fits what XCUITest does. Before each interaction it waits for the application to
+     * report idle, and React Native never does — the bridge, the animation driver and any live
+     * timer keep it busy — so each tap and each lookup waits out the timeout and then proceeds
+     * regardless. Bought nothing, charged every time. Zero here removes the wait.
+     *
+     * <p><b>What is not established is how much this saved.</b> It was first reported at 30%, on
+     * one run before against one run after. Eight later runs put the lane between 26.4 and
+     * 42.6 min with no code change capable of affecting it — a 1.6× spread on a shared macOS
+     * runner. Against that spread the with-change mean (34.7 min, n=8) and the without-change mean
+     * (35.6 min, n=2) are indistinguishable, and the original 30% is inside the noise.
+     *
+     * <p>So: the mechanism is real and the reasoning holds, and the effect has not been
+     * demonstrated. Separating them would need repeated runs each way, which is the honest cost of
+     * measuring anything on this runner. The setting stays because a wait that cannot succeed is
+     * not worth performing, not because a number was proved.
      *
      * <p>Raise it if a test races the UI. That would be a real signal rather than this one, and
      * the honest fix is usually an explicit wait on the thing being raced.
