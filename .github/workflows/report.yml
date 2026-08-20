@@ -19,7 +19,7 @@ name: Report
 
 on:
   workflow_run:
-    workflows: ["Android"]
+    workflows: ["Android", "iOS"]
     types: [completed]
   workflow_dispatch:
 
@@ -48,15 +48,111 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Download every Allure result from the triggering run
-        uses: actions/download-artifact@v8
-        with:
-          pattern: allure-results-*
-          path: downloaded
-          merge-multiple: true
-          run-id: ${{ github.event.workflow_run.id || github.run_id }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-        continue-on-error: true
+      # Results from *both* platform lanes, not just whichever run triggered this.
+      #
+      # This downloaded from github.event.workflow_run.id and triggered on Android alone, so the
+      # published report was Android-only: 27 tests, no iOS. The iOS lane uploaded
+      # allure-results-ios to its own run and nothing ever read it.
+      #
+      # Which is the wrong report for this repository in particular. The framework's whole claim
+      # is that one suite runs on Android and iOS with no platform branching, and the public
+      # artifact offered as evidence showed one platform. The README was at least honest about it
+      # — "published from every Android run" — but an honest description of the wrong thing is
+      # still the wrong thing.
+      #
+      # So: ignore which workflow woke this up, and take the newest completed run of each lane.
+      # Whichever finishes second publishes a report containing both.
+      #
+      # Deliberately `completed` rather than `success`. A failing iOS run's results are exactly
+      # the ones worth reading, and filtering to green is how a report starts flattering the
+      # suite it is supposed to describe.
+      - name: Collect Allure results from both platform lanes
+        id: collect
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p downloaded
+
+          # Every lane runs the same suite, so the same test name arrives three times — api31,
+          # api34, ios — carrying the same historyId. Allure keys on historyId, so merging them
+          # untouched makes it treat three independent runs as retries of one test and show a
+          # single status. Measured on real artifacts: 27 of the ids collided, and the iOS lane
+          # was contributing two *broken* results against 27 passing Android ones. Those two
+          # would have disappeared behind a green tick.
+          #
+          # So each result is stamped with its lane before merging: the historyId is suffixed so
+          # the lanes stay distinct and each keeps its own trend line, and a `lane` parameter is
+          # added so the report shows which is which.
+          cat > tag.py <<'PY'
+          import json, pathlib, shutil, sys
+          src, dest, lane = pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2]), sys.argv[3]
+          n = 0
+          for f in src.iterdir():
+              if not f.is_file():
+                  continue
+              out = dest / f.name
+              if f.name.endswith('-result.json'):
+                  d = json.loads(f.read_text(encoding='utf-8'))
+                  d['historyId'] = (d.get('historyId') or '') + '::' + lane
+                  d['parameters'] = (d.get('parameters') or []) + [{'name': 'lane', 'value': lane}]
+                  out.write_text(json.dumps(d), encoding='utf-8')
+                  n += 1
+              elif not out.exists():
+                  shutil.copy2(f, out)
+          print(f'  lane={lane}: {n} result(s)')
+          PY
+
+          for wf in android.yml ios.yml; do
+            rid=$(gh run list --workflow="$wf" --branch main --status completed --limit 1 \
+                    --json databaseId --jq '.[0].databaseId // empty')
+            if [ -z "$rid" ]; then
+              echo "$wf: no completed run yet"
+              continue
+            fi
+
+            tmp=$(mktemp -d)
+            if gh run download "$rid" -D "$tmp" --pattern 'allure-results-*' 2>/dev/null; then
+              concl=$(gh run view "$rid" --json conclusion --jq .conclusion)
+              echo "$wf: run $rid ($concl)"
+              # One directory per artifact, so the lane name is the artifact suffix.
+              for dir in "$tmp"/allure-results-*; do
+                [ -d "$dir" ] || continue
+                lane=$(basename "$dir"); lane=${lane#allure-results-}
+                python3 tag.py "$dir" downloaded "$lane"
+                echo "$lane" >> lanes.txt
+              done
+            else
+              echo "$wf: run $rid has no allure-results-* artifact"
+            fi
+            rm -rf "$tmp"
+          done
+
+          total=$(find downloaded -name '*-result.json' | wc -l | tr -d ' ')
+          echo "total result files: $total"
+
+          # A historyId collision surviving this point means the lanes would silently fold
+          # together again, which is the whole failure being fixed. Cheap to assert.
+          python3 - <<'PY'
+          import json, glob, collections
+          ids = collections.Counter()
+          for f in glob.glob('downloaded/*-result.json'):
+              ids[json.load(open(f, encoding='utf-8')).get('historyId')] += 1
+          dupes = {k: v for k, v in ids.items() if v > 1}
+          print(f'{sum(ids.values())} results, {len(ids)} distinct historyIds')
+          if dupes:
+              raise SystemExit(
+                  f'::error::{len(dupes)} historyId collision(s) after lane tagging; '
+                  'Allure would merge those results and hide one lane behind another.')
+          PY
+
+          # Which lanes are represented is itself worth saying. The failure being fixed here was
+          # silent: the report looked complete and simply had no iOS in it.
+          if ! grep -qx 'ios' lanes.txt 2>/dev/null; then
+            echo "::warning title=iOS missing from report::No iOS results were available, so this report covers Android only."
+          fi
+          if ! grep -q '^api' lanes.txt 2>/dev/null; then
+            echo "::warning title=Android missing from report::No Android results were available."
+          fi
 
       - name: Stop early if the run produced no results
         id: check
@@ -112,15 +208,26 @@ jobs:
       - name: Name the run in the report
         if: steps.check.outputs.found == 'true'
         run: |
+          # No longer "Android #N" — this report is assembled from both lanes, so naming it
+          # after one of them was going to be wrong half the time.
           cat > downloaded/executor.json <<JSON
           {
             "name": "GitHub Actions",
             "type": "github",
-            "buildName": "Android #${{ github.event.workflow_run.run_number || github.run_number }}",
+            "buildName": "${{ github.event.workflow_run.name || 'Report' }} #${{ github.event.workflow_run.run_number || github.run_number }}",
             "buildUrl": "${{ github.event.workflow_run.html_url || github.server_url }}",
             "reportUrl": "${{ github.server_url }}/${{ github.repository }}"
           }
           JSON
+
+          # An environment panel, which this report has never had. The one fact a reader most
+          # needs from it is which platforms are actually in front of them.
+          {
+            echo "Framework=Appium 3 / Java 21 / JUnit 6"
+            echo "Lanes.in.this.report=$( [ -f lanes.txt ] && sort -u lanes.txt | paste -sd', ' - || echo none )"
+            echo "Lane.parameter=Every result carries a 'lane' parameter naming the device it ran on"
+          } > downloaded/environment.properties
+          cat downloaded/environment.properties
 
       - name: Generate the report
         if: steps.check.outputs.found == 'true'

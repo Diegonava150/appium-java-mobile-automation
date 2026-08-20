@@ -2,11 +2,15 @@
 
 [![Quality gate](https://github.com/Diegonava150/appium-java-mobile-automation/actions/workflows/quality-gate.yml/badge.svg)](https://github.com/Diegonava150/appium-java-mobile-automation/actions/workflows/quality-gate.yml)
 [![Android](https://github.com/Diegonava150/appium-java-mobile-automation/actions/workflows/android.yml/badge.svg)](https://github.com/Diegonava150/appium-java-mobile-automation/actions/workflows/android.yml)
+[![iOS](https://github.com/Diegonava150/appium-java-mobile-automation/actions/workflows/ios.yml/badge.svg)](https://github.com/Diegonava150/appium-java-mobile-automation/actions/workflows/ios.yml)
 [![Maestro smoke](https://github.com/Diegonava150/appium-java-mobile-automation/actions/workflows/maestro.yml/badge.svg)](https://github.com/Diegonava150/appium-java-mobile-automation/actions/workflows/maestro.yml)
 
-**📊 [Live Allure report](https://diegonava150.github.io/appium-java-mobile-automation/)** — published
-from every Android run, with history carried forward so trends, retries and performance drift
-accumulate rather than vanishing with the run that produced them.
+**📊 [Live Allure report](https://diegonava150.github.io/appium-java-mobile-automation/)** — every
+lane, Android **and** iOS, with history carried forward so trends, retries and performance drift
+accumulate rather than vanishing with the run that produced them. Each result carries a `lane`
+parameter naming the device it ran on, because all three lanes run the same suite and Allure would
+otherwise fold them into one another as retries — hiding, in the run this was found on, two broken
+iOS results behind twenty-seven passing Android ones.
 
 A cross-platform mobile test framework built around the problems that only exist on a device:
 fragmentation, app lifecycle, in-place upgrades, and flake.
