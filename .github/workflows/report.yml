@@ -224,7 +224,9 @@ jobs:
           # needs from it is which platforms are actually in front of them.
           {
             echo "Framework=Appium 3 / Java 21 / JUnit 6"
-            echo "Lanes.in.this.report=$( [ -f lanes.txt ] && sort -u lanes.txt | paste -sd', ' - || echo none )"
+            # paste -d takes a *list* of delimiters used cyclically, so -d', ' joined the
+            # first pair with a comma and the second with a space: "api31,api34 ios".
+            echo "Lanes.in.this.report=$( [ -f lanes.txt ] && sort -u lanes.txt | paste -sd, - | sed 's/,/, /g' || echo none )"
             echo "Lane.parameter=Every result carries a 'lane' parameter naming the device it ran on"
           } > downloaded/environment.properties
           cat downloaded/environment.properties
