@@ -13,7 +13,7 @@ jackson          = "2.22.2"
 slf4j            = "2.0.18"
 logback          = "1.6.3"
 awaitility       = "4.3.0"
-spotless         = "8.9.0"
+spotless         = "8.10.0"
 anthropic        = "2.57.0"  # Official Java SDK. Used only by the optional :ai module.
 
 [libraries]
