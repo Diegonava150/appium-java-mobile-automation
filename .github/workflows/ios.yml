@@ -152,6 +152,27 @@ jobs:
 
       # The session timings, extracted into the job summary so the next person does not have to
       # download an artifact to see where the time went.
+      #
+      # Read them as one sample, not as a measurement. Three runs on this runner have produced:
+      #
+      #     cold start        432 s          273 s          494 s
+      #     steady session     40 s           59 s
+      #     session setup            58-63% of the lane
+      #
+      # The first of those predates the warm-up step above; the other two follow it. Which is
+      # exactly the trap — 432 to 273 looks like the step working, until the next run comes back
+      # at 494 and the "improvement" turns out to be two samples either side of a spread wider
+      # than the thing being measured. That conclusion was drawn here and is withdrawn; so was a
+      # "30% faster" claim before it, for the same reason.
+      #
+      # What a single run does support is structure. The session count, and the share of the lane
+      # those sessions account for, are properties of the suite rather than of the morning — and
+      # 14 sessions eating 58-63% of the run is the finding worth acting on. The lever there is
+      # creating fewer sessions, not making each one faster.
+      #
+      # The warm-up step is justified on the same footing: it names the cold start and moves it
+      # out of whichever test ran first. Its commit message claims no wall-clock effect. Keep it
+      # that way.
       - name: Session timings
         if: always()
         run: |
