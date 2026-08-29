@@ -32,8 +32,15 @@ Studio.app/Contents/jbr/Contents/Home`.
 | One locator strategy: `Locators.id("<testID>")` | React Native's `testID` surfaces as `content-desc` on Android and the accessibility id on iOS, so one call resolves on both. XPath forces a full hierarchy walk and splits one concept across two syntaxes. | `./gradlew checkNoXPath` (ADR-003) |
 | Explicit waits only — never an implicit wait | Mixing the two makes the effective timeout an undocumented interaction of both values, varying by command. | ADR-004, by convention and review |
 | Screen objects expose intent and return the next screen; they never assert | A failure message should describe what the test wanted, not what the page did. | Review |
-| Quarantined tests carry an expiry date | An exemption with no deadline is a permanent one. | `QuarantinePolicy`, which fails the build on an expired `@Flaky` (ADR-006) |
+| Quarantined tests carry an expiry date | An exemption with no deadline is a permanent one. | `./gradlew checkQuarantine`, in `qualityGate` on every push, plus `QuarantinePolicy` at runtime (ADR-006) |
 | AI-healed locators must be accepted explicitly | Otherwise healing deletes the report instead of fixing the test. | `./gradlew checkLocatorDebt` (ADR-009) |
+
+Two of those enforce the same rule from different places, deliberately. `QuarantinePolicy` runs
+inside `FlakyExtension` while the annotated test executes, which means it only fires when the
+device suite runs *and* reaches that test — and the device lanes are slow, infrastructure-flaky
+and not required checks. An exemption could sit years past its date without blocking a merge,
+which is exactly the permanent exemption the rule exists to prevent. `checkQuarantine` reads the
+same annotation from source, needs no device, and runs on every push.
 
 If you need to break one of these, the escape hatch exists and is deliberately visible — for
 XPath, `// xpath-ok: <reason>` on the line. Use it and justify it; do not weaken the check.

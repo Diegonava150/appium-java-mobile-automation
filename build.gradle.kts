@@ -260,11 +260,90 @@ val checkLocatorDebt = tasks.register("checkLocatorDebt") {
  * `:tests` module correctly includes device-backed tests. Being explicit is what keeps
  * "the gate is green" from quietly meaning "the gate skipped everything".
  */
+/**
+ * Fails on an expired `@Flaky`, without a device.
+ *
+ * The expiry was already enforced — by `QuarantinePolicy`, called from `FlakyExtension` while the
+ * annotated test executes. That means it only fires when the device suite runs *and* reaches that
+ * test, and the device lanes are slow, infrastructure-flaky and deliberately not required checks.
+ * An exemption could therefore sit past its date indefinitely without blocking a single merge,
+ * which is precisely the "permanent exemption" the mechanism exists to prevent. The rule was real
+ * and its enforcement was in the one lane least likely to gate anything.
+ *
+ * So the same rule is checked here, from source, on every push. Reading the annotation rather than
+ * running the test is what makes it device-free — and the date in the source is the thing being
+ * asserted on anyway.
+ */
+val checkQuarantine = tasks.register("checkQuarantine") {
+    group = "verification"
+    description = "Fails on an @Flaky whose expires date has passed (ADR-006). No device required."
+
+    val sourceTrees = subprojects.map { project ->
+        project.layout.projectDirectory.dir("src").asFileTree.matching { include("**/*.java") }
+    }
+    inputs.files(sourceTrees)
+
+    // Deliberately not cacheable on inputs alone: the same unchanged source becomes a failure the
+    // day the date passes, so a task that skipped as UP-TO-DATE would keep reporting yesterday's
+    // answer. That is the exact failure mode this task exists to remove.
+    outputs.upToDateWhen { false }
+
+    val rootPath = rootDir
+
+    doLast {
+        val flakyBlock = Regex("""@Flaky\s*\(([^)]*)\)""", RegexOption.DOT_MATCHES_ALL)
+        val expiresIn = Regex("""expires\s*=\s*"([^"]*)"""")
+        val today = java.time.LocalDate.now()
+
+        val expired = mutableListOf<String>()
+        val malformed = mutableListOf<String>()
+        var found = 0
+
+        sourceTrees.forEach { tree ->
+            tree.forEach { file ->
+                // The annotation declaration itself is not a usage.
+                if (file.name == "Flaky.java") return@forEach
+                val text = file.readText()
+                flakyBlock.findAll(text).forEach { block ->
+                    found++
+                    val where = file.relativeTo(rootPath).path
+                    val raw = expiresIn.find(block.value)?.groupValues?.get(1)
+                    if (raw == null) {
+                        malformed += "$where  @Flaky with no expires"
+                        return@forEach
+                    }
+                    val date = runCatching { java.time.LocalDate.parse(raw) }.getOrNull()
+                    if (date == null) {
+                        malformed += "$where  expires=\"$raw\" is not an ISO-8601 date"
+                    } else if (date.isBefore(today)) {
+                        expired += "$where  expired on $raw"
+                    }
+                }
+            }
+        }
+
+        if (expired.isNotEmpty() || malformed.isNotEmpty()) {
+            throw GradleException(
+                buildString {
+                    appendLine("Quarantine policy (ADR-006). ${expired.size + malformed.size} problem(s):")
+                    (expired + malformed).forEach { appendLine("  $it") }
+                    appendLine()
+                    appendLine("An exemption with no deadline is a permanent one. Either:")
+                    appendLine("  - fix the underlying instability and remove @Flaky, or")
+                    appendLine("  - extend expires with a reason that says what changed.")
+                },
+            )
+        }
+        logger.lifecycle("Quarantine check passed: $found @Flaky annotation(s), none expired.")
+    }
+}
+
 val qualityGate = tasks.register("qualityGate") {
     group = "verification"
     description = "Format, compile, unit tests and the locator policy. No device required."
 
     dependsOn(checkNoXPath)
+    dependsOn(checkQuarantine)
     dependsOn(subprojects.map { "${it.path}:spotlessCheck" })
     dependsOn(subprojects.map { "${it.path}:compileJava" })
     dependsOn(subprojects.map { "${it.path}:compileTestJava" })
