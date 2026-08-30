@@ -327,6 +327,19 @@ public final class FrameworkConfig {
         return Duration.ofSeconds(integer("mobile.timeout.deviceLease.seconds", 300));
     }
 
+    /**
+     * How long {@code AppLifecycle.resetToCleanState()} waits for a reinstalled app to become
+     * launchable.
+     *
+     * <p>Generous because it covers a platform being slow rather than a test being wrong. The
+     * install call returns before iOS has finished registering the app, and the first run of the
+     * per-class reset failed on exactly that: {@code Application "…" is unknown to FrontBoard},
+     * from an activate issued microseconds too early.
+     */
+    public Duration appResetTimeout() {
+        return Duration.ofSeconds(integer("mobile.timeout.appReset.seconds", 60));
+    }
+
     // ------------------------------------------------------------- performance
 
     /**

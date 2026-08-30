@@ -57,13 +57,21 @@ they account for 10 of the 14 sessions, which becomes 3.
 
 ## Consequences
 
-**14 sessions become 7.** That is the claim, and it is checkable in the job summary of any single
-run, because it is a count rather than a duration.
+**14 sessions become 7.** Measured on the first CI run of this change, along with 21.1 min of
+session creation falling to 12.1 min. It is checkable in the job summary of any single run, because
+it is a count rather than a duration — which is exactly why the decision was staked on it.
 
 **No wall-clock claim is made here.** Seven fewer sessions at 40-60 s each should be worth several
 minutes, and the reinstall reset costs something back that has never been measured on this runner.
 The net is expected to be positive and is deliberately not stated as a number, for the same reason
 the two withdrawn claims above are not.
+
+**The reset has to wait, not assume.** That same first run failed one test with
+`Application "…" is unknown to FrontBoard`: `installApp` returns before iOS has finished making the
+app launchable, and the activate that followed was a moment too early. The reset now waits for the
+install to land and for the app to become launchable, separately, because those two failures mean
+different things — a missing app path versus a slow platform. It is the one part of the reset that
+can be covered without a device, and `AppResetWaitTest` covers it.
 
 **Isolation genuinely narrows.** Device state outside the app — permission grants, orientation,
 clipboard, anything a test simulated — now carries between tests in a `PER_CLASS` class, because

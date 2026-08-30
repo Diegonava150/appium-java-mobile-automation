@@ -4,6 +4,8 @@ import dev.diegonava.mobile.core.config.FrameworkConfig;
 import dev.diegonava.mobile.core.driver.DriverManager;
 import io.appium.java_client.InteractsWithApps;
 import java.time.Duration;
+import java.util.function.BooleanSupplier;
+import org.openqa.selenium.WebDriverException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -17,6 +19,9 @@ import org.slf4j.LoggerFactory;
 public final class AppLifecycle {
 
     private static final Logger log = LoggerFactory.getLogger(AppLifecycle.class);
+
+    /** Short enough not to add meaningful latency to a reset that usually succeeds immediately. */
+    private static final Duration POLL_INTERVAL = Duration.ofMillis(250);
 
     private AppLifecycle() {}
 
@@ -96,12 +101,64 @@ public final class AppLifecycle {
                 .toString();
 
         long startedAt = System.nanoTime();
+        Duration timeout = config.appResetTimeout();
         InteractsWithApps apps = apps();
+
         apps.terminateApp(id);
         apps.removeApp(id);
         apps.installApp(app);
-        apps.activateApp(id);
+
+        // installApp returns before the platform has finished making the app launchable, and the
+        // first CI run of this reset failed on precisely that gap:
+        //
+        //   FBSOpenApplicationServiceErrorDomain Code=1 ... Application "…" is unknown to FrontBoard
+        //
+        // from an activate issued a moment too early. Both conditions are waited for rather than
+        // assumed, and separately, because they fail differently: an install that never lands is a
+        // broken app path, while an install that lands but is not yet launchable is only slow.
+        waitFor(timeout, "%s to be installed".formatted(id), () -> apps.isAppInstalled(id));
+        waitFor(timeout, "%s to become launchable".formatted(id), () -> {
+            apps.activateApp(id);
+            return true;
+        });
+
         log.info("Reset {} to a clean state in {}ms", id, (System.nanoTime() - startedAt) / 1_000_000);
+    }
+
+    /**
+     * Polls until the condition holds, treating a driver exception as "not yet".
+     *
+     * <p>Explicit, like every other wait in this framework (ADR-004). Deliberately not Awaitility:
+     * core has no test-scoped dependencies on the main classpath, and this is one loop.
+     *
+     * <p>Package-private so {@code AppResetWaitTest} can cover it without a device. It is the part
+     * of the reset that already shipped one CI failure, and the only part that can be checked here.
+     */
+    static void waitFor(Duration timeout, String what, BooleanSupplier condition) {
+        long deadline = System.nanoTime() + timeout.toNanos();
+        RuntimeException last = null;
+        while (System.nanoTime() < deadline) {
+            try {
+                if (condition.getAsBoolean()) {
+                    return;
+                }
+                last = null;
+            } catch (WebDriverException e) {
+                last = e;
+            }
+            try {
+                Thread.sleep(POLL_INTERVAL.toMillis());
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException("Interrupted while waiting for " + what, e);
+            }
+        }
+        throw new IllegalStateException(
+                ("Timed out after %s waiting for %s. The app has been removed and reinstalled, so the "
+                                + "device is in a state no test can use — failing here rather than letting the "
+                                + "next test report something that looks like its own bug.")
+                        .formatted(timeout, what),
+                last);
     }
 
     public static boolean isRunningInForeground() {
