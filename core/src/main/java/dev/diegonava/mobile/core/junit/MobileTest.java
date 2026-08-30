@@ -26,4 +26,15 @@ import org.junit.jupiter.api.parallel.ExecutionMode;
 @Tag("mobile")
 @Execution(ExecutionMode.SAME_THREAD)
 @ExtendWith({DriverExtension.class, FailureArtifactExtension.class})
-public @interface MobileTest {}
+public @interface MobileTest {
+
+    /**
+     * How long one Appium session lives for this class.
+     *
+     * <p>Defaults to a session per test, which assumes nothing. A class that opts into
+     * {@link SessionScope#PER_CLASS} is asserting that its tests are isolated by the app being
+     * reinstalled between them, and do not depend on the device state or the session itself being
+     * fresh. Read {@link SessionScope#PER_CLASS} before setting it.
+     */
+    SessionScope session() default SessionScope.PER_TEST;
+}

@@ -55,6 +55,16 @@ Built directly on Jupiter's `TestTemplateInvocationContextProvider` rather than 
 `junit-pioneer`, which still targets JUnit 5 (see ADR-005). Retries are generated lazily by a
 spliterator that stops as soon as the test passes, so a stable test costs exactly one invocation.
 
+That laziness needs a second, dumber stopping condition, and finding out why cost a machine twenty
+minutes. A spliterator that stops on *outcomes* only stops if it is told about them, and JUnit tells
+an extension about the test body throwing and about a `@BeforeEach` **method** throwing — not about
+another extension's `BeforeEachCallback` throwing. `DriverExtension` is exactly that, and it throws
+when a session will not open. So a quarantined test on a sick device produced no outcome, ever, and
+the spliterator was asked for invocations without end until the CI job's own timeout killed it an
+hour later. It is now also bounded by invocations *handed out*, which the extension knows for
+certain; `FlakyInvocationBoundTest` holds that behaviour down, time-bounded, because the failure
+mode it guards is a hang rather than a wrong answer.
+
 ## Consequences
 
 - Quarantine becomes a loan rather than a landfill. The list cannot silently grow, because each

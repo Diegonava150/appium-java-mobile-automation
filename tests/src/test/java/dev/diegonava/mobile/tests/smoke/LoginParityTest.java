@@ -3,6 +3,7 @@ package dev.diegonava.mobile.tests.smoke;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.diegonava.mobile.core.junit.MobileTest;
+import dev.diegonava.mobile.core.junit.SessionScope;
 import dev.diegonava.mobile.screens.App;
 import dev.diegonava.mobile.screens.CatalogScreen;
 import dev.diegonava.mobile.screens.LoginScreen;
@@ -20,7 +21,7 @@ import org.junit.jupiter.api.Test;
  * That is the parity claim, and it is only meaningful because it is visible in the source: the
  * same class runs under {@code -Dmobile.platform=android} and {@code -Dmobile.platform=ios}.
  */
-@MobileTest
+@MobileTest(session = SessionScope.PER_CLASS)
 @Epic("Authentication")
 @Feature("Login")
 @DisplayName("Login")

@@ -27,7 +27,9 @@ all derived from its index:
 | `wdaLocalPort`    | `8100` | `8100 + n` |
 | `mjpegServerPort` | `9100` | `9100 + n` |
 
-`DriverExtension` leases a slot in `beforeEach` and releases it in `afterEach`, inside a `finally`.
+`DriverExtension` leases a slot and releases it inside a `finally`. Where that happens depends on
+the class's `SessionScope` — `beforeEach`/`afterEach` by default, `beforeAll`/`afterAll` for a class
+reusing one session (ADR-010). The pool contract is the same either way: whatever leases, releases.
 
 JUnit's thread count is set from `mobile.device.count`, but that is an optimisation, not the
 control. **The pool is the gate.** A thread with no slot blocks rather than racing onto a busy

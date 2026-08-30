@@ -34,6 +34,7 @@ Studio.app/Contents/jbr/Contents/Home`.
 | Screen objects expose intent and return the next screen; they never assert | A failure message should describe what the test wanted, not what the page did. | Review |
 | Quarantined tests carry an expiry date | An exemption with no deadline is a permanent one. | `./gradlew checkQuarantine`, in `qualityGate` on every push, plus `QuarantinePolicy` at runtime (ADR-006) |
 | AI-healed locators must be accepted explicitly | Otherwise healing deletes the report instead of fixing the test. | `./gradlew checkLocatorDebt` (ADR-009) |
+| A class reusing one session may not own the app process or the install | `SessionScope.PER_CLASS` reads like a pure speed change. For a class whose subject *is* a cold start, a backgrounding or an upgrade, it silently changes what the test measures — or, for the upgrade suite, throws on a device because there is no app path to reinstall from. | `./gradlew checkSessionScope` (ADR-010) |
 
 Two of those enforce the same rule from different places, deliberately. `QuarantinePolicy` runs
 inside `FlakyExtension` while the annotated test executes, which means it only fires when the

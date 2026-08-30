@@ -24,6 +24,7 @@ junit-bom               = { module = "org.junit:junit-bom",                     
 junit-jupiter           = { module = "org.junit.jupiter:junit-jupiter" }
 junit-jupiter-api       = { module = "org.junit.jupiter:junit-jupiter-api" }
 junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
+junit-platform-testkit  = { module = "org.junit.platform:junit-platform-testkit" }
 
 assertj-core = { module = "org.assertj:assertj-core",   version.ref = "assertj" }
 awaitility   = { module = "org.awaitility:awaitility",  version.ref = "awaitility" }

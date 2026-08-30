@@ -69,6 +69,41 @@ public final class AppLifecycle {
         apps().runAppInBackground(duration);
     }
 
+    /**
+     * Puts the app back to the state a freshly created session would find it in.
+     *
+     * <p>Removes and reinstalls it, which is what Appium's own between-session reset does while
+     * {@code noReset} and {@code fullReset} are both false. That is the point: this exists so a
+     * session can be reused across a class without the tests inside it becoming order-dependent,
+     * and it is only honest to reuse a session if what replaces the reset is equivalent to it.
+     *
+     * <p>{@link #coldRestart()} is deliberately not enough here. Its whole purpose is to preserve
+     * what the app persists — that is the contract the upgrade suite measures against — so a class
+     * resetting with it would carry a signed-in user or a filled cart into the following test.
+     *
+     * <p>Only the app is reinstalled. Device state around it — granted permissions, orientation,
+     * clipboard, anything a test simulated — survives, and a class that cannot tolerate that
+     * belongs on {@code SessionScope.PER_TEST}.
+     */
+    public static void resetToCleanState() {
+        FrameworkConfig config = FrameworkConfig.get();
+        String id = appId();
+        String app = config.appPath()
+                .orElseThrow(() -> new IllegalStateException(
+                        "Cannot reset " + id + " to a clean state: mobile.app.path is not set, so there is "
+                                + "nothing to reinstall. A suite that unsets it — the upgrade suite does, "
+                                + "deliberately — must use SessionScope.PER_TEST."))
+                .toString();
+
+        long startedAt = System.nanoTime();
+        InteractsWithApps apps = apps();
+        apps.terminateApp(id);
+        apps.removeApp(id);
+        apps.installApp(app);
+        apps.activateApp(id);
+        log.info("Reset {} to a clean state in {}ms", id, (System.nanoTime() - startedAt) / 1_000_000);
+    }
+
     public static boolean isRunningInForeground() {
         return apps().queryAppState(appId()).name().equals("RUNNING_IN_FOREGROUND");
     }
