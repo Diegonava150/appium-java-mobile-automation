@@ -54,6 +54,17 @@ updates:
     labels: [dependencies, ci]
     commit-message:
       prefix: "ci"
+    ignore:
+      # setup-java v6 resolves the JDK from the network on every job instead of the runner's
+      # tool cache, even with check-latest false. v5 answers the same request from cache with
+      # no network at all. The v6 bump was merged here as PR #33 and cost main's iOS lane that
+      # same day to a 504 on the download, before a single test ran.
+      #
+      # Scoped to the major version so security and patch updates still come through. Remove
+      # this when v6 stops going to the network — check a job log for "from tool-cache" rather
+      # than assuming, because the version alone does not tell you.
+      - dependency-name: actions/setup-java
+        update-types: [version-update:semver-major]
 
 # No docker ecosystem block, deliberately. There is no Dockerfile and no compose file in this
 # repository, and Dependabot's docker updater parses only those two. The gitleaks image tag in

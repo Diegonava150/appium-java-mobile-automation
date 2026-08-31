@@ -32,8 +32,20 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
+      # Pinned to v5 deliberately; do not take the v6 bump without re-checking this.
+      #
+      # v5 answers `java-version: 21` from the runner's tool cache:
+      #     Resolved Java 21.0.11+10.0 from tool-cache
+      # v6 ignores it and goes to the network on every job, even with check-latest false:
+      #     Trying to resolve the latest version from remote
+      #     Downloading Java 21.0.12+101.0.LTS from https://github.com/adoptium/...
+      #
+      # That turned a zero-network cache hit into a CDN dependency in every lane. It was merged
+      # here as PR #33, and cost main's iOS lane the same day when the download returned 504 three
+      # times and the job died before a single test ran. Cheap on a good day, and a whole lane on
+      # a bad one, for nothing this repository wanted.
       - name: Set up JDK 21
-        uses: actions/setup-java@v6
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 21
@@ -44,10 +56,40 @@ jobs:
       - name: Download the app under test
         run: ./gradlew downloadAndroidApp
 
+      # `curl | bash` reports the exit code of bash, and this installer exits 0 even when its
+      # download fails. On 2026-08-31 the vendor CDN returned a 504, the installer printed
+      # "Downloaded zip archive is corrupt", the step went green, and the job then spent three
+      # minutes booting an emulator and installing an APK before dying on `maestro: not found`
+      # with exit 127 — a fifteen-second failure reported four minutes late, in the wrong place,
+      # as something else.
+      #
+      # So the install is retried, and then checked. `maestro --version` is the assertion: it is
+      # the difference between "the installer ran" and "maestro is on PATH and works", which is
+      # the only property the next step actually needs.
       - name: Install Maestro
         run: |
-          curl -Ls "https://get.maestro.mobile.dev" | bash
-          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+          set -euo pipefail
+
+          for attempt in 1 2 3; do
+            if curl --fail --silent --show-error --location \
+                 --retry 3 --retry-delay 5 --retry-all-errors \
+                 "https://get.maestro.mobile.dev" | bash; then
+              if "$HOME/.maestro/bin/maestro" --version >/dev/null 2>&1; then
+                echo "Maestro installed on attempt $attempt."
+                echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+                exit 0
+              fi
+              echo "::warning::Attempt $attempt: the installer exited 0 but maestro does not run."
+            else
+              echo "::warning::Attempt $attempt: the installer download failed."
+            fi
+            sleep $((attempt * 10))
+          done
+
+          echo "::error::Maestro could not be installed after 3 attempts."
+          echo "The installer exits 0 on a failed download, so this step checks 'maestro --version'"
+          echo "rather than trusting it. Failing here, rather than 3 minutes later as 'command not found'."
+          exit 1
 
       - name: Run the smoke flows
         uses: reactivecircus/android-emulator-runner@v2
