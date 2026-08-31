@@ -192,9 +192,21 @@ jobs:
             echo "Carried forward $restored history file(s) from $site."
           fi
 
+      # Pinned to v5 deliberately; do not take the v6 bump without re-checking this.
+      #
+      # v5 answers `java-version: 21` from the runner's tool cache:
+      #     Resolved Java 21.0.11+10.0 from tool-cache
+      # v6 ignores it and goes to the network on every job, even with check-latest false:
+      #     Trying to resolve the latest version from remote
+      #     Downloading Java 21.0.12+101.0.LTS from https://github.com/adoptium/...
+      #
+      # That turned a zero-network cache hit into a CDN dependency in every lane. It was merged
+      # here as PR #33, and cost main's iOS lane the same day when the download returned 504 three
+      # times and the job died before a single test ran. Cheap on a good day, and a whole lane on
+      # a bad one, for nothing this repository wanted.
       - name: Set up JDK 21
         if: steps.check.outputs.found == 'true'
-        uses: actions/setup-java@v6
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 21
