@@ -69,4 +69,40 @@ class TypedTextVerificationTest {
     void deliberately_empty() {
         assertThat(BaseScreen.arrivedIntact("", "")).isTrue();
     }
+
+    @Test
+    @DisplayName("a field that formats a card number as it is typed is accepted")
+    void card_number_auto_formatting() {
+        // The regression this predicate caused on its first CI run. Four Android tests failed with
+        // "Typed 16 characters ... and the field still reads 4111 1111 1111 1111" — which is the
+        // field doing its job. A check that calls correct behaviour a defect is worse than no check.
+        assertThat(BaseScreen.arrivedIntact("4111111111111111", "4111 1111 1111 1111"))
+                .isTrue();
+    }
+
+    @Test
+    @DisplayName("other separators a field supplies are accepted too")
+    void other_inserted_separators() {
+        assertThat(BaseScreen.arrivedIntact("1225", "12/25")).isTrue();
+        assertThat(BaseScreen.arrivedIntact("5551234567", "(555) 123-4567")).isTrue();
+    }
+
+    @Test
+    @DisplayName("a digit genuinely missing from a formatted field is still caught")
+    void formatting_does_not_hide_a_dropped_digit() {
+        // The formatting allowance must not become a blanket amnesty: strip the spaces and this
+        // card is fifteen digits, not sixteen.
+        assertThat(BaseScreen.arrivedIntact("4111111111111111", "4111 1111 1111 111"))
+                .isFalse();
+    }
+
+    @Test
+    @DisplayName("stripping separators must not blur an email into a different one")
+    void separator_stripping_is_narrow() {
+        // Why the strip set is spaces, hyphens, slashes and brackets rather than \W: losing "@"
+        // and "." would make these two indistinguishable, and this is the exact corruption the
+        // whole check exists to catch.
+        assertThat(BaseScreen.arrivedIntact("bob@example.com", "bobexample.com"))
+                .isFalse();
+    }
 }

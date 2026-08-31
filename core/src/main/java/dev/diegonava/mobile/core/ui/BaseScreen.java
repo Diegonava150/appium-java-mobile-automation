@@ -251,13 +251,27 @@ public abstract class BaseScreen {
         if (actual == null) {
             return true;
         }
-        if (expected.equals(actual)) {
-            return true;
-        }
         if (!actual.isEmpty() && actual.chars().allMatch(BaseScreen::isMaskCharacter)) {
             return actual.length() == expected.length();
         }
-        return actual.isEmpty() && expected.isEmpty();
+        return unformatted(expected).equalsIgnoreCase(unformatted(actual));
+    }
+
+    /**
+     * Strips the punctuation a field inserts on the user's behalf.
+     *
+     * <p>Only separators, and only the ones fields actually add: a card number types as sixteen
+     * digits and displays as {@code 4111 1111 1111 1111}, an expiry as {@code 12/25}, a phone
+     * number in brackets. Comparing those literally is how this check failed four Android tests on
+     * its first run, calling correct formatting a dropped keystroke.
+     *
+     * <p>Deliberately not {@code \W}, which would also strip {@code @} and {@code .} and make
+     * {@code bobexample.com} indistinguishable from {@code bob@example.com}. The signal being
+     * protected is characters going missing, so the only characters safe to ignore are ones the
+     * field is known to supply itself.
+     */
+    private static String unformatted(String text) {
+        return text.replaceAll("[\\s\\-/()]", "");
     }
 
     private static boolean isMaskCharacter(int character) {
