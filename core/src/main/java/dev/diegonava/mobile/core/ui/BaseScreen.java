@@ -193,7 +193,15 @@ public abstract class BaseScreen {
      * seconds later with <em>"CatalogScreen did not appear"</em>, which is true, useless, and three
      * steps removed from the cause. It had been dismissed as an infrastructure flake more than once.
      *
-     * <p>So the text is read back. A retry usually settles it, and if it does not, the failure names
+     * <p>So the text is read back — and when it is wrong, the retry changes strategy rather than
+     * simply trying the same thing again. Retrying a bulk {@code sendKeys} was measured and does
+     * not work: three attempts left {@code be.com} in a field that had been sent
+     * {@code bob@example.com} three times. Note what survived — b, e, ., c, o, m, a subsequence of
+     * the original. Characters are not being mangled, they are being dropped in transit, which is
+     * what an overrun looks like rather than a typo.
+     *
+     * <p>So attempt one sends the string whole, because that is fast and usually correct, and every
+     * attempt after it sends one character at a time. If even that does not hold, the failure names
      * the field and quotes what is actually in it.
      */
     protected void type(By locator, String text) {
@@ -201,7 +209,16 @@ public abstract class BaseScreen {
         for (int attempt = 1; attempt <= TYPE_ATTEMPTS; attempt++) {
             WebElement field = visible(locator);
             field.clear();
-            field.sendKeys(text);
+
+            if (attempt == 1) {
+                field.sendKeys(text);
+            } else {
+                // One key per request. Slower by roughly the number of characters, and only paid
+                // on a field that has already proved it drops them.
+                for (int i = 0; i < text.length(); i++) {
+                    field.sendKeys(String.valueOf(text.charAt(i)));
+                }
+            }
 
             actual = readBack(field);
             if (arrivedIntact(text, actual)) {
@@ -209,18 +226,20 @@ public abstract class BaseScreen {
                 return;
             }
             log.warn(
-                    "Attempt {} of {}: typing into {} left \"{}\" in the field. Retrying.",
+                    "Attempt {} of {}: typing into {} left \"{}\" in the field. Retrying{}.",
                     attempt,
                     TYPE_ATTEMPTS,
                     locator,
-                    actual);
+                    actual,
+                    attempt == 1 ? " one character at a time" : "");
         }
 
         hideKeyboard();
         throw new IllegalStateException(
-                ("Typed %d characters into %s %d times and the field still reads \"%s\". This is the "
-                                + "dropped-keystroke failure, not a missing element: whatever is submitted next "
-                                + "will be wrong, and the error it produces will point somewhere else.")
+                ("Typed %d characters into %s %d times — once whole, then one character at a time — "
+                                + "and the field still reads \"%s\". This is the dropped-keystroke failure, not "
+                                + "a missing element: whatever is submitted next will be wrong, and the error it "
+                                + "produces will point somewhere else.")
                         .formatted(text.length(), locator, TYPE_ATTEMPTS, actual));
     }
 
