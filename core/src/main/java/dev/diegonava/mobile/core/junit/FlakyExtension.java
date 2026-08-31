@@ -68,6 +68,7 @@ public final class FlakyExtension implements TestTemplateInvocationContextProvid
         private final List<String> failures = new ArrayList<>();
 
         private int attempts;
+        private int handedOut;
         private boolean passed;
 
         private RetryState(String testId, String displayName, Flaky flaky) {
@@ -94,6 +95,39 @@ public final class FlakyExtension implements TestTemplateInvocationContextProvid
             return passed || attempts >= flaky.maxAttempts();
         }
 
+        /**
+         * Claims one invocation, or refuses once {@code maxAttempts} have been handed out.
+         *
+         * <p>The stopping condition cannot be {@link #isComplete()} alone, because that counts
+         * only outcomes this extension was told about. It is told about the test body throwing,
+         * and about a {@code @BeforeEach} <em>method</em> throwing. It is told nothing when a
+         * {@code BeforeEachCallback} <em>extension</em> throws — JUnit routes that to neither
+         * handler — so {@code attempts} stays at zero, {@code isComplete()} stays false, and the
+         * spliterator is asked for another invocation forever.
+         *
+         * <p>That is not hypothetical and it is not obscure: {@link DriverExtension} is such a
+         * callback, and it throws when a session fails to open, which is this suite's single most
+         * common infrastructure failure. A {@code @Flaky} test on a device that would not start
+         * span the build until the CI job hit its own timeout, an hour later, with nothing in the
+         * log to say why. Found by a local run burning 6745 CPU seconds on three tests that do
+         * nothing.
+         *
+         * <p>So the bound is on invocations requested, which is a fact this class owns, rather
+         * than on outcomes reported, which it only hears about sometimes.
+         */
+        synchronized boolean claimInvocation() {
+            if (handedOut >= flaky.maxAttempts()) {
+                return false;
+            }
+            handedOut++;
+            return true;
+        }
+
+        /** True when invocations ran but none of them reported an outcome. See {@link #claimInvocation}. */
+        synchronized boolean outcomeWasNeverRecorded() {
+            return handedOut > 0 && attempts == 0;
+        }
+
         synchronized void publish() {
             FlakeLedger.record(new FlakeRecord(
                     testId,
@@ -113,6 +147,15 @@ public final class FlakyExtension implements TestTemplateInvocationContextProvid
                         testId);
             } else if (passed) {
                 log.warn("{} passed only on attempt {} of {}", testId, attempts, flaky.maxAttempts());
+            } else if (outcomeWasNeverRecorded()) {
+                // "failed all 0 attempts" would be the literal truth and completely misleading.
+                log.error(
+                        "{} ran {} invocation(s) that reported no outcome at all, and was stopped by the "
+                                + "invocation bound. That means something threw from a BeforeEachCallback "
+                                + "extension — DriverExtension failing to open a session is the usual one. "
+                                + "The retry could not have helped; look at the first exception, not at this.",
+                        testId,
+                        handedOut);
             } else {
                 log.error("{} failed all {} attempts", testId, attempts);
             }
@@ -133,8 +176,10 @@ public final class FlakyExtension implements TestTemplateInvocationContextProvid
 
         @Override
         public boolean tryAdvance(Consumer<? super TestTemplateInvocationContext> action) {
-            if (state.isComplete()) {
-                // JUnit has stopped asking for invocations, so the outcome is settled.
+            // Two independent stopping conditions, and both are needed. isComplete() ends the
+            // retries early on a pass; claimInvocation() is the backstop that ends them at all
+            // when no outcome is ever reported. See RetryState.claimInvocation.
+            if (state.isComplete() || !state.claimInvocation()) {
                 state.publish();
                 return false;
             }
@@ -161,10 +206,19 @@ public final class FlakyExtension implements TestTemplateInvocationContextProvid
      *
      * <p>Implements <b>both</b> exception-handler interfaces, and the second one is not optional.
      * {@link TestExecutionExceptionHandler} covers exceptions thrown by the test body and nothing
-     * else; a failure inside a {@code BeforeEachCallback} goes to
+     * else; a failure inside a {@code @BeforeEach} <em>method</em> goes to
      * {@link LifecycleMethodExecutionExceptionHandler} instead. Handling only the first meant this
-     * extension retried the failures a mobile suite rarely has and ignored the one it has most
-     * often — {@code DriverExtension} failing to open a session.
+     * extension retried the failures a mobile suite rarely has and ignored a whole class of the
+     * ones it actually gets.
+     *
+     * <p><b>Between them they still do not cover everything.</b> An exception thrown by a
+     * {@code BeforeEachCallback} <em>extension</em> reaches neither — JUnit's lifecycle handler is
+     * for lifecycle methods, not for other extensions' callbacks. {@link DriverExtension} is such
+     * a callback, so a session that fails to open is *not* retried by this class and never will
+     * be; it is only stopped from looping forever, by the invocation bound in
+     * {@link RetryState#claimInvocation()}. An earlier version of this comment claimed the
+     * opposite. Retrying it would need a different mechanism, and is probably not worth having:
+     * a device that will not give out a session rarely gives one out three seconds later.
      *
      * <p>That gap was live in CI and read as something else entirely. The iOS lane reported
      * {@code [attempt 1 of 3] FAILED} followed by {@code [attempt 2 of 3] PASSED}, and then failed

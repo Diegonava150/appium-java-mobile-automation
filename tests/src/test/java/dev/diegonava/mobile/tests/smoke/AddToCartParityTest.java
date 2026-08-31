@@ -3,6 +3,7 @@ package dev.diegonava.mobile.tests.smoke;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.diegonava.mobile.core.junit.MobileTest;
+import dev.diegonava.mobile.core.junit.SessionScope;
 import dev.diegonava.mobile.screens.App;
 import dev.diegonava.mobile.screens.CartScreen;
 import dev.diegonava.mobile.screens.CatalogScreen;
@@ -15,7 +16,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /** The core commerce path, run unchanged on both platforms. */
-@MobileTest
+@MobileTest(session = SessionScope.PER_CLASS)
 @Epic("Commerce")
 @Feature("Cart")
 @DisplayName("Add to cart")

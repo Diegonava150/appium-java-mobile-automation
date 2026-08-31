@@ -274,6 +274,69 @@ val checkLocatorDebt = tasks.register("checkLocatorDebt") {
  * running the test is what makes it device-free — and the date in the source is the thing being
  * asserted on anyway.
  */
+// Session reuse is a trade against isolation, and the two kinds of test that must never make it
+// are the ones whose subject *is* the app process or the install. AppUpgradeTest additionally
+// unsets mobile.app.path, so the reinstall the reset depends on has nothing to reinstall and
+// would fail at runtime — on a device, in a slow lane, which is the worst place to learn it.
+//
+// The annotation makes that easy to get wrong: adding `session = SessionScope.PER_CLASS` to a
+// class looks like a pure speed change and reads like one in review. This is the check that
+// disagrees, from source, with no device.
+val checkSessionScope = tasks.register("checkSessionScope") {
+    group = "verification"
+    description = "Fails on a PER_CLASS test class whose subject is the app process or the install."
+
+    val sourceTrees = subprojects.map { project ->
+        project.layout.projectDirectory.dir("src").asFileTree.matching { include("**/*.java") }
+    }
+    inputs.files(sourceTrees)
+    outputs.upToDateWhen { false }
+
+    val rootPath = rootDir
+
+    doLast {
+        // Owning the process lifecycle, or the install, is the disqualifier.
+        val incompatible = mapOf(
+            "AppLifecycle" to "drives the app process directly; a shared session makes its cold "
+                + "starts and backgrounding no longer mean what they say",
+            "AppUpgrade" to "unsets mobile.app.path, so the reinstall the per-class reset performs "
+                + "has nothing to install and throws",
+        )
+
+        val violations = mutableListOf<String>()
+        var perClassCount = 0
+
+        sourceTrees.forEach { tree ->
+            tree.forEach { file ->
+                if (file.name == "SessionScope.java" || file.name == "DriverExtension.java") return@forEach
+                val text = file.readText()
+                if (!text.contains("SessionScope.PER_CLASS")) return@forEach
+                perClassCount++
+                val where = file.relativeTo(rootPath).path
+                incompatible.forEach { (type, why) ->
+                    if (Regex("\\b" + type + "\\b").containsMatchIn(text)) {
+                        violations += "$where  uses $type, which $why"
+                    }
+                }
+            }
+        }
+
+        if (violations.isNotEmpty()) {
+            throw GradleException(
+                buildString {
+                    appendLine("Session scope. ${violations.size} problem(s):")
+                    violations.forEach { appendLine("  $it") }
+                    appendLine()
+                    appendLine("Move the class back to the default SessionScope.PER_TEST. Reusing a")
+                    appendLine("session is worth roughly 40-60s per test avoided, which is never worth")
+                    appendLine("a test that no longer measures what its name says.")
+                },
+            )
+        }
+        logger.lifecycle("Session scope: $perClassCount class(es) on PER_CLASS, none owning the app process or install.")
+    }
+}
+
 val checkQuarantine = tasks.register("checkQuarantine") {
     group = "verification"
     description = "Fails on an @Flaky whose expires date has passed (ADR-006). No device required."
@@ -344,6 +407,7 @@ val qualityGate = tasks.register("qualityGate") {
 
     dependsOn(checkNoXPath)
     dependsOn(checkQuarantine)
+    dependsOn(checkSessionScope)
     dependsOn(subprojects.map { "${it.path}:spotlessCheck" })
     dependsOn(subprojects.map { "${it.path}:compileJava" })
     dependsOn(subprojects.map { "${it.path}:compileTestJava" })

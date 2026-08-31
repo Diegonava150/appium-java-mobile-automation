@@ -13,12 +13,15 @@ import org.openqa.selenium.By;
 import org.openqa.selenium.Dimension;
 import org.openqa.selenium.NoSuchElementException;
 import org.openqa.selenium.TimeoutException;
+import org.openqa.selenium.WebDriverException;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.interactions.PointerInput;
 import org.openqa.selenium.interactions.Sequence;
 import org.openqa.selenium.support.ui.ExpectedCondition;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Shared behaviour for screen objects.
@@ -33,6 +36,16 @@ import org.openqa.selenium.support.ui.WebDriverWait;
  * what the test wanted rather than what the page did.
  */
 public abstract class BaseScreen {
+
+    private static final Logger log = LoggerFactory.getLogger(BaseScreen.class);
+
+    /**
+     * How many times {@link #type} will retype a field whose contents come back wrong.
+     *
+     * <p>Three, because the observed failure drops a character or a whole field on one attempt and
+     * not the next. A field that is wrong three times running is not a race.
+     */
+    private static final int TYPE_ATTEMPTS = 3;
 
     /** Enough swipes to cross any screen in this app; a bound stops a missing element spinning. */
     private static final int MAX_SCROLL_SWIPES = 8;
@@ -166,17 +179,103 @@ public abstract class BaseScreen {
     }
 
     /**
-     * Clears the field and types into it, then dismisses the keyboard.
+     * Clears the field, types into it, checks that the text actually arrived, and dismisses the
+     * keyboard.
      *
      * <p>The keyboard matters: on both platforms a raised keyboard can cover the very control the
      * next step needs to tap, and the resulting failure looks like a missing element rather than
      * an obscured one.
+     *
+     * <p>The check matters more, and it was added after a green-looking suite spent weeks lying.
+     * {@code sendKeys} into a React Native field on iOS silently drops characters. A sign-in typed
+     * {@code bb@example.com} for {@code bob@example.com} and an empty password, the app said
+     * "Provided credentials do not match any user in this service" — and the test failed twenty
+     * seconds later with <em>"CatalogScreen did not appear"</em>, which is true, useless, and three
+     * steps removed from the cause. It had been dismissed as an infrastructure flake more than once.
+     *
+     * <p>So the text is read back. A retry usually settles it, and if it does not, the failure names
+     * the field and quotes what is actually in it.
      */
     protected void type(By locator, String text) {
-        WebElement field = visible(locator);
-        field.clear();
-        field.sendKeys(text);
+        String actual = null;
+        for (int attempt = 1; attempt <= TYPE_ATTEMPTS; attempt++) {
+            WebElement field = visible(locator);
+            field.clear();
+            field.sendKeys(text);
+
+            actual = readBack(field);
+            if (arrivedIntact(text, actual)) {
+                hideKeyboard();
+                return;
+            }
+            log.warn(
+                    "Attempt {} of {}: typing into {} left \"{}\" in the field. Retrying.",
+                    attempt,
+                    TYPE_ATTEMPTS,
+                    locator,
+                    actual);
+        }
+
         hideKeyboard();
+        throw new IllegalStateException(
+                ("Typed %d characters into %s %d times and the field still reads \"%s\". This is the "
+                                + "dropped-keystroke failure, not a missing element: whatever is submitted next "
+                                + "will be wrong, and the error it produces will point somewhere else.")
+                        .formatted(text.length(), locator, TYPE_ATTEMPTS, actual));
+    }
+
+    /** What the field says it contains, or {@code null} when it will not say. */
+    private String readBack(WebElement field) {
+        try {
+            String own = field.getText();
+            return own == null ? null : own.trim();
+        } catch (WebDriverException e) {
+            // Unreadable is not the same as wrong. Handled by the caller as "cannot verify".
+            return null;
+        }
+    }
+
+    /**
+     * Whether what came back is consistent with what was typed.
+     *
+     * <p>Three cases, and the middle one is why this is not an equality check. A plain field echoes
+     * the text. A secure field echoes a row of bullets, so only the length can be compared — an
+     * empty password field after typing eight characters is exactly the bug above, and has to stay
+     * a failure. And a field that reports nothing at all cannot be judged either way, so it is
+     * accepted rather than invented into a failure; that is the behaviour this method replaced, and
+     * it is the safe direction to be wrong in.
+     */
+    // Package-private for TypedTextVerificationTest: this predicate decides whether a passing
+    // test becomes a failing one, so it is the part that must not be reasoned about only in prose.
+    static boolean arrivedIntact(String expected, String actual) {
+        if (actual == null) {
+            return true;
+        }
+        if (!actual.isEmpty() && actual.chars().allMatch(BaseScreen::isMaskCharacter)) {
+            return actual.length() == expected.length();
+        }
+        return unformatted(expected).equalsIgnoreCase(unformatted(actual));
+    }
+
+    /**
+     * Strips the punctuation a field inserts on the user's behalf.
+     *
+     * <p>Only separators, and only the ones fields actually add: a card number types as sixteen
+     * digits and displays as {@code 4111 1111 1111 1111}, an expiry as {@code 12/25}, a phone
+     * number in brackets. Comparing those literally is how this check failed four Android tests on
+     * its first run, calling correct formatting a dropped keystroke.
+     *
+     * <p>Deliberately not {@code \W}, which would also strip {@code @} and {@code .} and make
+     * {@code bobexample.com} indistinguishable from {@code bob@example.com}. The signal being
+     * protected is characters going missing, so the only characters safe to ignore are ones the
+     * field is known to supply itself.
+     */
+    private static String unformatted(String text) {
+        return text.replaceAll("[\\s\\-/()]", "");
+    }
+
+    private static boolean isMaskCharacter(int character) {
+        return character == '•' || character == '*' || character == '●' || character == '·';
     }
 
     /**

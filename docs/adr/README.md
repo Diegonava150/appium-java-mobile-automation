@@ -15,6 +15,7 @@ one approach was taken over the three that also would have worked.
 | [007](0007-no-api-seeding.md)          | No API seeding, because this app has no state API            |
 | [008](0008-appium-and-maestro.md)      | Use Appium and Maestro, and be clear about which does what   |
 | [009](0009-ai-as-instrumentation-not-self-healing.md) | AI as opt-in instrumentation, never a silent self-heal |
+| [010](0010-session-scope.md)           | Reuse a session across a class, opt-in, with a real reset    |
 
 ADR-002 carries a measured postscript worth reading on its own: two devices produced **no
 speedup** on a single host. The isolation design is correct and was verified; the speed benefit
